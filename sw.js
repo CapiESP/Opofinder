@@ -1,5 +1,5 @@
-// OpoFinder - Service Worker v4 (Corporate Theme, Milestones & Syllabus)
-const CACHE_NAME = 'opofinder-cache-v4';
+// OpoFinder - Service Worker v5 (Closed Beta, Corporate SVGs & Terminal Alerts)
+const CACHE_NAME = 'opofinder-cache-v5';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

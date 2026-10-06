@@ -16,40 +16,35 @@
   <link rel="icon" type="image/png" href="favicon.png">
   
   <!-- Estilos Corporativos (Modo Claro & Oscuro) -->
-  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="styles.css?v=5">
   
   <!-- Supabase JS Client (v2) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-  <!-- ==================== 1. PANTALLA DE ACCESO (SUPABASE AUTH) ==================== -->
+  <!-- ==================== 1. PANTALLA DE ACCESO (BETA CERRADA) ==================== -->
   <div id="auth-container" class="auth-wrapper">
     <div class="auth-card">
+      
       <div class="auth-header">
-        <img src="icon-192.png" alt="OpoFinder Logo" class="auth-logo-img">
+        <img src="icon-192.png" alt="OpoFinder Emblem" class="auth-logo-img">
+        <div class="beta-tag-pill">
+          <span class="beta-status-dot"></span>
+          BETA CERRADA &bull; ACCESO PRIVADO
+        </div>
         <h2 class="auth-title">OpoFinder</h2>
-        <p class="auth-subtitle">Portal Oficial de Empleo Público y Convocatorias</p>
-      </div>
-
-      <!-- Selector de pestañas Login / Registro -->
-      <div class="auth-tabs">
-        <button type="button" class="auth-tab-btn active" id="tab-btn-login" onclick="switchAuthMode('login')">
-          Iniciar Sesión
-        </button>
-        <button type="button" class="auth-tab-btn" id="tab-btn-register" onclick="switchAuthMode('register')">
-          Crear Cuenta
-        </button>
+        <p class="auth-subtitle">Sistema Integrado de Convocatorias y Empleo Público</p>
       </div>
 
       <!-- Mensaje de Alerta / Error -->
       <div id="auth-alert" class="auth-alert"></div>
 
-      <!-- Formulario de Autenticación -->
+      <!-- Formulario de Autenticación Exclusivo (Sin registro libre) -->
       <form id="auth-form" onsubmit="handleAuthSubmit(event)">
         <div class="form-group" style="margin-bottom: 14px;">
-          <label for="auth-email">Correo Electrónico</label>
-          <input type="email" id="auth-email" class="form-control" placeholder="opositor@correo.com" required autocomplete="email">
+          <label for="auth-email">Correo Electrónico Autorizado</label>
+          <input type="email" id="auth-email" class="form-control" placeholder="usuario@admitido.es" required autocomplete="email">
         </div>
 
         <div class="form-group" style="margin-bottom: 18px;">
@@ -58,13 +53,38 @@
         </div>
 
         <button type="submit" id="auth-submit-btn" class="btn btn-primary btn-block">
-          Acceder a OpoFinder
+          <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <span>Acceder a OpoFinder</span>
         </button>
       </form>
 
-      <div style="text-align: center; margin-top: 18px; font-size: 12px; color: var(--text-muted);">
-        🔒 Acceso protegido y sincronización multidispositivo
+      <!-- Aviso Explicativo de Beta Cerrada -->
+      <div class="beta-disclaimer-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <div>
+          <strong>Acceso restringido a usuarios seleccionados.</strong>
+          El registro libre está desactivado durante la fase de validación técnica y de boletines.
+        </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ==================== PANTALLA DE CARGA CORPORATIVA ==================== -->
+  <div id="login-loading-screen" class="login-loading-screen" style="display: none;">
+    <div class="loading-card">
+      <div class="loading-emblem-wrap">
+        <img src="icon-192.png" alt="OpoFinder" class="loading-emblem">
+        <div class="loading-spinner-ring"></div>
+      </div>
+      <h3 class="loading-title">Verificando Credenciales</h3>
+      <p class="loading-step" id="loading-step-text">Conectando con el servidor oficial...</p>
+      <div class="loading-meter">
+        <div class="loading-meter-bar" id="loading-meter-bar"></div>
+      </div>
+      <span class="loading-security-badge">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        Canal Encriptado &bull; Supabase Auth
+      </span>
     </div>
   </div>
 
@@ -83,13 +103,22 @@
         </div>
         
         <div class="header-right">
-          <!-- Botón de Conmutador de Tema Claro / Oscuro -->
+          <!-- Botón de Conmutador de Tema Claro / Oscuro con SVG -->
           <button id="theme-toggle" class="theme-toggle-btn" title="Alternar Modo Claro / Oscuro" onclick="toggleTheme()">
-            🌙
+            <svg id="theme-icon-svg" class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
           </button>
           
           <span class="user-pill" id="user-display-email">usuario@...</span>
-          <button class="btn-logout" onclick="handleLogout()" title="Cerrar Sesión">Salir</button>
+          <button class="btn-logout" onclick="handleLogout()" title="Cerrar Sesión">
+            <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            <span>Salir</span>
+          </button>
         </div>
       </div>
     </header>
@@ -100,15 +129,17 @@
       <!-- Banner Informativo para iOS Safari -->
       <div class="ios-banner" id="ios-banner">
         <div class="ios-banner-text">
-          📲 <strong>Instalación en iPhone:</strong> Pulsa <strong>Compartir</strong> y selecciona <strong>"Añadir a pantalla de inicio"</strong> para tener OpoFinder como app con acceso directo oficial.
+          <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+          <span><strong>Instalación en iPhone:</strong> Pulsa <strong>Compartir</strong> y elige <strong>"Añadir a pantalla de inicio"</strong> para acceder con el icono corporativo oficial.</span>
         </div>
-        <button class="ios-banner-btn" id="close-ios-banner">Cerrar</button>
+        <button class="ios-banner-btn" id="close-ios-banner">Entendido</button>
       </div>
 
       <!-- Banner de Alerta de Convocatorias Coincidentes -->
       <div class="ios-banner" id="alert-banner" style="display: none; border-left-color: var(--gold);">
         <div class="ios-banner-text">
-          🔔 <strong id="alert-banner-text">Tienes nuevas convocatorias coincidentes.</strong>
+          <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          <span id="alert-banner-text">Nuevas convocatorias coincidentes con tus criterios.</span>
         </div>
         <button class="ios-banner-btn" onclick="switchTab('filtros')">Ver Alertas</button>
       </div>
@@ -136,10 +167,10 @@
 
             <!-- Filtro por Región -->
             <div class="form-group">
-              <label for="filter-region">Región / Ámbito</label>
+              <label for="filter-region">Región / Ámbito Territorial</label>
               <select id="filter-region" class="form-control">
-                <option value="TODAS">Todas las regiones</option>
-                <option value="Estatal">Estatal (Ministerios y AGE)</option>
+                <option value="TODAS">Todo el Territorio Nacional</option>
+                <option value="Estatal">Administración General del Estado</option>
                 <option value="Andalucía">Andalucía</option>
                 <option value="Aragón">Aragón</option>
                 <option value="Asturias">Asturias</option>
@@ -165,17 +196,17 @@
 
             <!-- Filtro por Tipo de Proceso (Convocatoria vs Oferta OEP) -->
             <div class="form-group">
-              <label for="filter-type">Tipo de Proceso</label>
+              <label for="filter-type">Tipo de Procedimiento</label>
               <select id="filter-type" class="form-control">
                 <option value="TODOS">Todos (Convocatorias + Ofertas OEP)</option>
-                <option value="Convocatoria">Solo Convocatorias (Plazo Abierto)</option>
-                <option value="Oferta OEP">Solo Ofertas (OEP Pendientes)</option>
+                <option value="Convocatoria">Convocatorias (Plazo Abierto)</option>
+                <option value="Oferta OEP">Ofertas (OEP Aprobadas)</option>
               </select>
             </div>
 
             <!-- Rango de Días del BOE -->
             <div class="form-group">
-              <label for="filter-days">Publicadas en el BOE</label>
+              <label for="filter-days">Publicadas en Boletín Oficial</label>
               <select id="filter-days" class="form-control">
                 <option value="1">Solo Hoy</option>
                 <option value="3">Últimos 3 días</option>
@@ -187,8 +218,8 @@
 
             <!-- Búsqueda por Texto -->
             <div class="form-group">
-              <label for="filter-search">Buscar Puesto / Término</label>
-              <input type="text" id="filter-search" class="form-control" placeholder="Ej: Auxiliar, Informática, Policía...">
+              <label for="filter-search">Término o Puesto Específico</label>
+              <input type="text" id="filter-search" class="form-control" placeholder="Ej: Auxiliar, Informática, Gestión, Policía...">
             </div>
 
           </div>
@@ -196,23 +227,25 @@
           <!-- Checkbox para Omitir Caducadas -->
           <label class="checkbox-row">
             <input type="checkbox" id="filter-hide-expired" checked>
-            <span><strong>Omitir convocatorias con plazo cerrado</strong> (muestra solo procesos vigentes)</span>
+            <span><strong>Omitir convocatorias con plazo cerrado</strong> (mostrar solo procedimientos vigentes)</span>
           </label>
 
           <!-- Acciones del Panel -->
           <div class="filter-actions">
             <button id="btn-save-filter" class="btn btn-outline btn-sm">
-              ⭐ Guardar Filtro de Alerta
+              <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+              <span>Guardar Filtro de Alerta</span>
             </button>
             <button id="btn-refresh-boe" class="btn btn-primary btn-sm">
-              🔄 Actualizar Listado
+              <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              <span>Actualizar Listado</span>
             </button>
           </div>
         </div>
 
         <!-- Cabecera de Resultados -->
         <div class="results-header">
-          <h2 style="font-size: 16px; font-weight: 700;">Convocatorias Oficiales</h2>
+          <h2 style="font-size: 15px; font-weight: 700;">Convocatorias Oficiales</h2>
           <span class="results-count" id="results-count">Cargando convocatorias...</span>
         </div>
 
@@ -229,54 +262,113 @@
       <!-- ==================== PESTAÑA 2: GUARDADAS ==================== -->
       <section id="tab-guardadas" class="tab-section" style="display: none;">
         <div class="results-header">
-          <h2 style="font-size: 18px; font-weight: 700;">⭐ Mis Oposiciones en Seguimiento</h2>
-          <span class="results-count">Pulsa en cualquier tarjeta para ver su temario y activar avisos de examen</span>
+          <h2 style="font-size: 16px; font-weight: 700;">Oposiciones en Seguimiento</h2>
+          <span class="results-count">Selecciona cualquier convocatoria para consultar su temario y cronograma</span>
         </div>
         <div id="saved-container"></div>
       </section>
 
-      <!-- ==================== PESTAÑA 3: FILTROS & ALERTAS ==================== -->
+      <!-- ==================== PESTAÑA 3: AVISOS Y TERMINAL ==================== -->
       <section id="tab-filtros" class="tab-section" style="display: none;">
-        <div class="filter-panel">
-          <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 6px;">🔔 Mis Filtros y Alertas Activas</h2>
-          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-            El sistema rastrea los boletines oficiales y te avisará cuando se publiquen nuevas convocatorias que encajen con tus criterios.
+        
+        <!-- Módulo 1: Configuración de Avisos en el Terminal -->
+        <div class="filter-panel" style="margin-bottom: 20px;">
+          <h2 style="font-size: 17px; font-weight: 700; margin-bottom: 6px;">
+            Avisos y Notificaciones en el Terminal
+          </h2>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">
+            Configura la entrega directa de alertas a tu dispositivo móvil o navegador ante resoluciones oficiales o novedades de la plataforma.
           </p>
-          
-          <div style="margin-bottom: 16px;">
-            <button class="btn btn-primary btn-sm" onclick="requestNotificationPermission()">
-              📱 Activar Notificaciones en este Dispositivo
-            </button>
+
+          <div class="terminal-config-card">
+            <!-- Opción 1: Convocatorias Guardadas -->
+            <div class="terminal-option-row">
+              <div class="terminal-option-info">
+                <h4>Avisos en Convocatorias Guardadas</h4>
+                <p>Notificar cuando se publiquen listas provisionales/definitivas de admitidos, subsanaciones o la fecha y aulas de examen de tus oposiciones en seguimiento.</p>
+              </div>
+              <div>
+                <label class="switch">
+                  <input type="checkbox" id="terminal-notif-saved" checked onchange="toggleTerminalSetting('saved', this.checked)">
+                </label>
+              </div>
+            </div>
+
+            <!-- Opción 2: Novedades de la App -->
+            <div class="terminal-option-row">
+              <div class="terminal-option-info">
+                <h4>Novedades y Actualizaciones del Sistema</h4>
+                <p>Avisar ante nuevas fuentes autonómicas integradas (BOC, etc.), ofertas de empleo público destacadas o mejoras de servicio.</p>
+              </div>
+              <div>
+                <label class="switch">
+                  <input type="checkbox" id="terminal-notif-app" checked onchange="toggleTerminalSetting('app', this.checked)">
+                </label>
+              </div>
+            </div>
+
+            <!-- Estado del Permiso y Prueba -->
+            <div style="padding-top: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted);">
+                <span>Estado de permisos:</span>
+                <span id="terminal-permission-badge" class="badge" style="font-weight: 600;">Comprobando...</span>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="sendTerminalTestAlert()">
+                <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                <span>Probar aviso en este terminal</span>
+              </button>
+            </div>
           </div>
 
+          <!-- Módulo CLI para Terminal de Consola -->
+          <div style="margin-top: 16px;">
+            <h4 style="font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">
+              Monitorización mediante Terminal de Comandos (CLI / Servidor)
+            </h4>
+            <p style="font-size: 12px; color: var(--text-muted);">
+              Para recibir notificaciones directamente en tu consola, servidor o cron job automatizado:
+            </p>
+            <div class="cli-code-block">
+              <code>node scripts/opofinder-terminal.js --check-alerts</code>
+            </div>
+          </div>
+        </div>
+
+        <!-- Módulo 2: Filtros de Alerta Guardados -->
+        <div class="filter-panel">
+          <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 6px;">Criterios de Alerta Guardados</h3>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+            El rastreador compara las publicaciones diarias del BOE con estos criterios de búsqueda:
+          </p>
           <div id="filters-list"></div>
         </div>
+
       </section>
 
       <!-- ==================== PESTAÑA 4: GUÍA Y AYUDA ==================== -->
       <section id="tab-ayuda" class="tab-section" style="display: none;">
         <div class="filter-panel">
-          <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">ℹ️ Guía Oficial para el Opositor</h2>
+          <h2 style="font-size: 17px; font-weight: 700; margin-bottom: 12px;">Guía de Procedimiento para Opositores</h2>
           
           <div style="font-size: 14px; line-height: 1.6; color: var(--text-main); display: flex; flex-direction: column; gap: 14px;">
-            <div>
-              <strong>1. Ciclo de Vida y Notificaciones de Examen:</strong>
-              <p style="color: var(--text-muted); font-size: 13px;">
-                Al abrir la ficha de una oposición, puedes activar la campana de <em>"Notificarme cambios"</em>. Te avisará automáticamente si se publica la lista de admitidos, la subsanación o la fecha y aula de examen.
+            <div style="padding-bottom: 10px; border-bottom: 1px solid var(--border);">
+              <strong>1. Ciclo de Vida y Notificaciones de Examen</strong>
+              <p style="color: var(--text-muted); font-size: 13px; margin-top: 3px;">
+                Al abrir la ficha de una oposición, puedes activar los avisos específicos para esa convocatoria. El sistema monitorizará las publicaciones oficiales y te alertará cuando se determinen las listas de admitidos o la fecha oficial de examen.
+              </p>
+            </div>
+
+            <div style="padding-bottom: 10px; border-bottom: 1px solid var(--border);">
+              <strong>2. Temarios Oficiales y Progreso de Estudio</strong>
+              <p style="color: var(--text-muted); font-size: 13px; margin-top: 3px;">
+                Cada ficha detalla los bloques normativos y materias oficiales de la categoría (General y Específica). Las casillas de verificación permiten registrar los temas completados y calcular el porcentaje de avance.
               </p>
             </div>
 
             <div>
-              <strong>2. Temarios Oficiales:</strong>
-              <p style="color: var(--text-muted); font-size: 13px;">
-                Cada ficha incluye el desglose de temas del programa oficial (Parte General y Parte Específica) y un sistema para marcar los temas estudiados o repasados.
-              </p>
-            </div>
-
-            <div>
-              <strong>3. Instalación en iPhone / Safari:</strong>
-              <p style="color: var(--text-muted); font-size: 13px;">
-                Pulsa el icono de <em>Compartir</em> en Safari y elige <em>"Añadir a la pantalla de inicio"</em>. El icono corporativo oficial se guardará en tu móvil.
+              <strong>3. Instalación en iPhone / Safari</strong>
+              <p style="color: var(--text-muted); font-size: 13px; margin-top: 3px;">
+                Pulsa el icono de Compartir en Safari y selecciona <em>"Añadir a la pantalla de inicio"</em> para disponer de OpoFinder en tu móvil con icono institucional y funcionamiento a pantalla completa.
               </p>
             </div>
           </div>
@@ -288,21 +380,36 @@
     <!-- Barra de Navegación Inferior Móvil -->
     <nav class="bottom-nav">
       <button class="nav-item active" data-tab="buscador">
-        <span class="icon">🔍</span>
+        <svg class="icon-nav" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
         <span>Buscador</span>
       </button>
+
       <button class="nav-item" data-tab="guardadas">
-        <span class="icon">⭐</span>
+        <svg class="icon-nav" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+        </svg>
         <span>Guardadas</span>
         <span class="nav-badge" id="saved-badge" style="display: none;">0</span>
       </button>
+
       <button class="nav-item" data-tab="filtros">
-        <span class="icon">🔔</span>
-        <span>Alertas</span>
+        <svg class="icon-nav" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <span>Avisos</span>
         <span class="nav-badge" id="filters-badge" style="display: none;">0</span>
       </button>
+
       <button class="nav-item" data-tab="ayuda">
-        <span class="icon">ℹ️</span>
+        <svg class="icon-nav" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
         <span>Guía</span>
       </button>
     </nav>
@@ -323,13 +430,13 @@
         <!-- Pestañas del Modal -->
         <div class="modal-nav-tabs">
           <button class="modal-tab-btn active" data-modaltab="hitos" onclick="switchModalTab('hitos')">
-            📋 Estado y Examen
+            Estado & Examen
           </button>
           <button class="modal-tab-btn" data-modaltab="temario" onclick="switchModalTab('temario')">
-            📚 Temario Oficial
+            Temario Oficial
           </button>
           <button class="modal-tab-btn" data-modaltab="notas" onclick="switchModalTab('notas')">
-            📝 Mis Notas
+            Mis Notas
           </button>
         </div>
 
@@ -344,6 +451,6 @@
   </div>
 
   <!-- Script Principal -->
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

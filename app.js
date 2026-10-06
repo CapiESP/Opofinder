@@ -77,71 +77,49 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // --- 4. Gestión de Autenticación (Login / Registro / Logout) ---
-function switchAuthMode(mode) {
-  authMode = mode;
-  const loginTab = document.getElementById('tab-btn-login');
-  const registerTab = document.getElementById('tab-btn-register');
-  const submitBtn = document.getElementById('auth-submit-btn');
-  const alertEl = document.getElementById('auth-alert');
-  
-  alertEl.style.display = 'none';
-
-  if (mode === 'login') {
-    loginTab.classList.add('active');
-    registerTab.classList.remove('active');
-    submitBtn.textContent = 'Entrar a OpoFinder';
-  } else {
-    registerTab.classList.add('active');
-    loginTab.classList.remove('active');
-    submitBtn.textContent = 'Crear Cuenta y Entrar';
-  }
-}
-
 async function handleAuthSubmit(e) {
   e.preventDefault();
   const email = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
   const submitBtn = document.getElementById('auth-submit-btn');
   const alertEl = document.getElementById('auth-alert');
+  const loadingScreen = document.getElementById('login-loading-screen');
+  const loadingStep = document.getElementById('loading-step-text');
 
   if (!email || !password) return;
 
   submitBtn.disabled = true;
-  submitBtn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;border-top-color:#fff;"></span> Procesando...';
   alertEl.style.display = 'none';
+
+  // Activar pantalla de carga corporativa
+  if (loadingScreen) {
+    loadingScreen.style.display = 'flex';
+    if (loadingStep) loadingStep.textContent = 'Verificando credenciales oficiales...';
+  }
 
   try {
     const client = getSupabaseClient();
     if (!client) throw new Error('No se pudo conectar con el servidor de autenticación');
 
-    if (authMode === 'login') {
-      const { data, error } = await client.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      showToast('¡Bienvenido de nuevo!');
-    } else {
-      const { data, error } = await client.auth.signUp({ email, password });
-      if (error) throw error;
-      
-      if (data?.session) {
-        showToast('¡Cuenta creada con éxito!');
-      } else {
-        // En caso de que el proyecto de Supabase requiera confirmación por email
-        alertEl.className = 'auth-alert success';
-        alertEl.textContent = '¡Cuenta registrada! Si tienes activada la confirmación por correo, revisa tu bandeja de entrada para verificar tu cuenta.';
-        alertEl.style.display = 'block';
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Crear Cuenta y Entrar';
-        return;
-      }
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+
+    if (loadingStep) {
+      loadingStep.textContent = 'Sincronizando convocatorias del BOE y CCAA...';
     }
+    await new Promise(r => setTimeout(r, 650));
+
+    showToast('Sesión autorizada en Beta Cerrada');
   } catch (err) {
     console.error('Error de autenticación:', err);
+    if (loadingScreen) loadingScreen.style.display = 'none';
     alertEl.className = 'auth-alert error';
-    alertEl.textContent = err.message || 'Error al autenticar. Revisa tus datos e inténtalo de nuevo.';
+    alertEl.textContent = err.message === 'Invalid login credentials' 
+      ? 'Credenciales no autorizadas o incorrectas en esta fase de Beta Cerrada.' 
+      : (err.message || 'Error al autenticar. Revisa tus credenciales e inténtalo de nuevo.');
     alertEl.style.display = 'block';
   } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = authMode === 'login' ? 'Entrar a OpoFinder' : 'Crear Cuenta y Entrar';
   }
 }
 
@@ -163,21 +141,25 @@ function handleAuthState(session) {
   const authContainer = document.getElementById('auth-container');
   const appContent = document.getElementById('app-content');
   const userEmailDisplay = document.getElementById('user-display-email');
+  const loadingScreen = document.getElementById('login-loading-screen');
 
   if (session && session.user) {
     currentUser = session.user;
-    authContainer.style.display = 'none';
-    appContent.style.display = 'block';
+    if (authContainer) authContainer.style.display = 'none';
+    if (loadingScreen) loadingScreen.style.display = 'none';
+    if (appContent) appContent.style.display = 'block';
     if (userEmailDisplay) {
       userEmailDisplay.textContent = currentUser.email;
     }
 
     // Cargar datos propios del usuario autenticado
     loadUserData();
+    initTerminalAlertsUI();
   } else {
     currentUser = null;
-    authContainer.style.display = 'flex';
-    appContent.style.display = 'none';
+    if (loadingScreen) loadingScreen.style.display = 'none';
+    if (authContainer) authContainer.style.display = 'flex';
+    if (appContent) appContent.style.display = 'none';
   }
 }
 
@@ -712,10 +694,15 @@ function renderCards(list, containerEl) {
   if (!list || list.length === 0) {
     containerEl.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">📭</div>
-        <h3>No se encontraron convocatorias</h3>
-        <p style="color: var(--text-muted); font-size: 14px; margin-top: 6px;">
-          Prueba a ampliar el rango de días o cambiar los filtros de categoría y región.
+        <svg class="icon-inline" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); margin-bottom: 8px;">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+        <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main);">No se encontraron convocatorias</h3>
+        <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">
+          Ajusta los filtros territoriales o amplía el rango de días de publicación.
         </p>
       </div>
     `;
@@ -734,15 +721,15 @@ function createCardHTML(item) {
   
   let trafficHtml = '';
   if (item.tipo === 'Oferta OEP') {
-    trafficHtml = `<span class="traffic-light traffic-green">📋 Oferta OEP Aprobada (Pendiente Convocatoria)</span>`;
+    trafficHtml = `<span class="traffic-light"><span class="status-dot status-dot-gray"></span> Oferta OEP Aprobada</span>`;
   } else if (item.diasRestantes < 0) {
-    trafficHtml = `<span class="traffic-light traffic-red">🔴 Plazo finalizado</span>`;
+    trafficHtml = `<span class="traffic-light traffic-red"><span class="status-dot status-dot-red"></span> Plazo cerrado</span>`;
   } else if (item.diasRestantes === 0) {
-    trafficHtml = `<span class="traffic-light traffic-red">🔴 ¡Último día hoy!</span>`;
+    trafficHtml = `<span class="traffic-light traffic-red"><span class="status-dot status-dot-red"></span> Último día de solicitudes</span>`;
   } else if (item.diasRestantes <= 5) {
-    trafficHtml = `<span class="traffic-light traffic-yellow">🟡 Quedan ${item.diasRestantes} días</span>`;
+    trafficHtml = `<span class="traffic-light traffic-yellow"><span class="status-dot status-dot-yellow"></span> Quedan ${item.diasRestantes} días</span>`;
   } else {
-    trafficHtml = `<span class="traffic-light traffic-green">🟢 Quedan ${item.diasRestantes} días hábiles</span>`;
+    trafficHtml = `<span class="traffic-light traffic-green"><span class="status-dot status-dot-green"></span> Plazo abierto (${item.diasRestantes} días)</span>`;
   }
   
   const boletinName = item.boletin || 'BOE';
@@ -759,13 +746,23 @@ function createCardHTML(item) {
           ${plazasText ? `<span class="badge badge-plazas">${plazasText}</span>` : ''}
           <span class="badge badge-boletin">${boletinName}</span>
         </div>
-        <button class="btn-bookmark ${isSaved ? 'active' : ''}" onclick="event.stopPropagation(); toggleBookmark('${item.id}')" title="${isSaved ? 'Desmarcar y borrar de tu cuenta' : 'Guardar oposición'}">
-          ${isSaved ? '★' : '☆'}
+        <button class="btn-bookmark ${isSaved ? 'active' : ''}" onclick="event.stopPropagation(); toggleBookmark('${item.id}')" title="${isSaved ? 'Quitar de guardadas' : 'Guardar oposición'}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="${isSaved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+          </svg>
         </button>
       </div>
       
       <h3 class="card-title">${escapeHTML(item.titulo)}</h3>
-      <div class="card-organismo">🏛️ ${escapeHTML(item.organismo)}</div>
+      <div class="card-organismo">
+        <svg class="icon-inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -2px;">
+          <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+          <line x1="9" y1="22" x2="9" y2="18"></line>
+          <line x1="15" y1="22" x2="15" y2="18"></line>
+          <line x1="9" y1="18" x2="15" y2="18"></line>
+        </svg>
+        ${escapeHTML(item.organismo)}
+      </div>
       
       <div class="card-meta-grid">
         <div class="meta-item">
@@ -774,27 +771,43 @@ function createCardHTML(item) {
         </div>
         <div class="meta-item">
           <span class="meta-label">Plazo de solicitudes:</span>
-          <span class="meta-value">${item.plazoLimite || 'Ver bases'}</span>
+          <span class="meta-value">${item.plazoLimite || 'Ver bases oficiales'}</span>
         </div>
         <div class="meta-item">
-          <span class="meta-label">Estado del proceso:</span>
+          <span class="meta-label">Estado de la fase:</span>
           <div class="meta-value">${trafficHtml}</div>
         </div>
         <div class="meta-item">
           <span class="meta-label">Fecha del examen:</span>
-          <span class="meta-value" style="color: var(--text-muted); font-style: italic;">Por determinar en resolución</span>
+          <span class="meta-value" style="color: var(--text-muted); font-style: italic;">Pendiente de resolución</span>
         </div>
       </div>
       
       <div class="card-actions">
         <button class="btn-view-detail" onclick="event.stopPropagation(); openDetailModal('${item.id}')">
-          📖 Temario & Hitos
+          <svg class="icon-inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+          </svg>
+          <span>Temario & Hitos</span>
         </button>
         <a href="${item.urlOficial}" target="_blank" rel="noopener" onclick="event.stopPropagation();" class="btn btn-outline btn-sm">
-          🌐 Ver en ${boletinName}
+          <svg class="icon-inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+          <span>${boletinName}</span>
         </a>
         <a href="${item.urlPdf}" target="_blank" rel="noopener" download="${item.id}.pdf" onclick="event.stopPropagation();" class="btn-download-pdf">
-          📥 Bases Oficiales
+          <svg class="icon-inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="12" y1="18" x2="12" y2="12"></line>
+            <line x1="9" y1="15" x2="12" y2="18"></line>
+            <line x1="15" y1="15" x2="12" y2="18"></line>
+          </svg>
+          <span>Bases PDF</span>
         </a>
       </div>
     </div>
@@ -831,7 +844,11 @@ async function toggleBookmark(id) {
     const btn = card.querySelector('.btn-bookmark');
     if (btn) {
       btn.classList.toggle('active', !isCurrentlySaved);
-      btn.innerHTML = !isCurrentlySaved ? '★' : '☆';
+      btn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="${!isCurrentlySaved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+        </svg>
+      `;
     }
     card.classList.toggle('saved-highlight', !isCurrentlySaved);
   }
@@ -846,10 +863,12 @@ function renderGuardadas() {
   if (!state.guardadas || state.guardadas.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">⭐</div>
-        <h3>No tienes oposiciones guardadas</h3>
-        <p style="color: var(--text-muted); font-size: 14px; margin-top: 6px;">
-          Pulsa la estrella (☆) en las convocatorias del buscador para guardarlas y descargarlas cuando quieras.
+        <svg class="icon-inline" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); margin-bottom: 8px;">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main);">Sin oposiciones en seguimiento</h3>
+        <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">
+          Pulsa el marcador en las convocatorias del buscador para guardarlas y hacer seguimiento de fechas y temarios.
         </p>
       </div>
     `;
@@ -1042,10 +1061,13 @@ function renderFiltrosList() {
   if (!state.filtrosGuardados || state.filtrosGuardados.length === 0) {
     listEl.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">🔔</div>
-        <h3>No tienes filtros de alerta guardados</h3>
-        <p style="color: var(--text-muted); font-size: 14px; margin-top: 6px;">
-          En el buscador, selecciona tu categoría y región y pulsa "Guardar Filtro de Alerta" para recibir avisos de nuevas publicaciones.
+        <svg class="icon-inline" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); margin-bottom: 8px;">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main);">Sin filtros de alerta guardados</h3>
+        <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">
+          Define tus parámetros en el buscador y pulsa "Guardar Filtro de Alerta" para ser notificado de nuevas convocatorias.
         </p>
       </div>
     `;
@@ -1103,7 +1125,7 @@ async function deleteFilter(id) {
 // --- 11. Service Worker & Notificaciones PWA ---
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=4').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=5').catch(err => {
       console.warn('Fallo SW:', err);
     });
   }
@@ -1232,8 +1254,29 @@ function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   const toggleBtn = document.getElementById('theme-toggle');
   if (toggleBtn) {
-    toggleBtn.innerHTML = theme === 'dark' ? '☀️' : '🌙';
-    toggleBtn.title = theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
+    if (theme === 'dark') {
+      toggleBtn.innerHTML = `
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+      `;
+      toggleBtn.title = 'Cambiar a modo claro';
+    } else {
+      toggleBtn.innerHTML = `
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      `;
+      toggleBtn.title = 'Cambiar a modo oscuro';
+    }
   }
 }
 
@@ -1311,7 +1354,7 @@ function renderModalHitos(container, opo) {
     <div style="background: var(--bg-subtle); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; border: 1px solid var(--border);">
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
         <span style="font-size: 13px; font-weight: 700; color: var(--text-main);">
-          ${isOep ? '📋 Oferta de Empleo Público' : '📄 Convocatoria Oficial'}
+          ${isOep ? 'Oferta de Empleo Público (OEP)' : 'Convocatoria Oficial Publicada'}
         </span>
         <span class="badge ${isOep ? 'badge-oep' : 'badge-convocatoria'}">
           ${isOep ? 'OEP Aprobada' : (isCerrado ? 'Plazo Cerrado' : `Plazo Abierto (${opo.diasRestantes} días)`)}
@@ -1319,19 +1362,19 @@ function renderModalHitos(container, opo) {
       </div>
       <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
         Publicado en <strong>${opo.boletin || 'BOE'}</strong> el ${opo.fechaPublicacion}
-        ${opo.plazas ? `• <strong>${opo.plazas} plazas</strong>` : ''}
+        ${opo.plazas ? `&bull; <strong>${opo.plazas} plazas</strong>` : ''}
       </div>
     </div>
 
     <!-- Timeline del Ciclo de Vida -->
     <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--text-main);">
-      📍 Fases del Procedimiento Selectivo
+      Fases del Procedimiento Selectivo
     </h4>
 
     <div class="lifecycle-timeline">
       <!-- Paso 1 -->
       <div class="timeline-step completed">
-        <div class="timeline-dot">✓</div>
+        <div class="timeline-dot">1</div>
         <div class="timeline-content">
           <h4>1. Publicación de la OEP</h4>
           <p>Aprobada en Consejo de Gobierno / Pleno Municipal.</p>
@@ -1340,7 +1383,7 @@ function renderModalHitos(container, opo) {
 
       <!-- Paso 2 -->
       <div class="timeline-step ${isOep ? 'current' : 'completed'}">
-        <div class="timeline-dot">${isOep ? '⏳' : '✓'}</div>
+        <div class="timeline-dot">2</div>
         <div class="timeline-content">
           <h4>2. Publicación de Bases y Convocatoria</h4>
           <p>${isOep ? 'Pendiente de publicación en boletín oficial.' : `Publicado en ${opo.boletin || 'BOE'} (${opo.fechaPublicacion}).`}</p>
@@ -1349,9 +1392,9 @@ function renderModalHitos(container, opo) {
 
       <!-- Paso 3 -->
       <div class="timeline-step ${isOep ? '' : (isCerrado ? 'completed' : 'current')}">
-        <div class="timeline-dot">${isOep ? '3' : (isCerrado ? '✓' : '●')}</div>
+        <div class="timeline-dot">3</div>
         <div class="timeline-content">
-          <h4>3. Plazo de Presentación de Instancias</h4>
+          <h4>3. Plazo de Presentación de Solicitudes</h4>
           <p>${isOep ? 'Se abrirá tras la publicación oficial.' : (isCerrado ? `Finalizado el ${opo.plazoLimite}` : `Abierto hasta el ${opo.plazoLimite} (quedan ${opo.diasRestantes} días)`)}</p>
         </div>
       </div>
@@ -1361,17 +1404,17 @@ function renderModalHitos(container, opo) {
         <div class="timeline-dot">4</div>
         <div class="timeline-content">
           <h4>4. Listas Provisionales de Admitidos y Excluidos</h4>
-          <p>Publicación de listas y plazo de 10 días hábiles para subsanación.</p>
+          <p>Publicación de relaciones provisionales y plazo de 10 días para subsanación.</p>
         </div>
       </div>
 
       <!-- Paso 5: Clave Fecha de Examen -->
-      <div class="timeline-step" style="background: var(--gold-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--gold);">
-        <div class="timeline-dot" style="background: var(--gold); color: white;">🎯</div>
+      <div class="timeline-step" style="background: var(--bg-subtle); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+        <div class="timeline-dot" style="background: var(--gold); color: #fff; border-color: var(--gold);">5</div>
         <div class="timeline-content">
-          <h4 style="color: var(--text-main);">5. Fecha de Examen y Distribución de Aulas</h4>
-          <p style="color: var(--text-main); font-weight: 500;">
-            ${opo.fechaExamen ? `📅 Fecha anunciada: <strong>${opo.fechaExamen}</strong>` : '⏳ Pendiente de resolución por el Tribunal Calificador.'}
+          <h4 style="color: var(--text-main);">5. Fecha de Examen y Sedes Oficiales</h4>
+          <p style="color: var(--text-muted); font-weight: 500;">
+            ${opo.fechaExamen ? `Fecha anunciada: <strong>${opo.fechaExamen}</strong>` : 'Pendiente de resolución por el Tribunal Calificador.'}
           </p>
         </div>
       </div>
@@ -1381,7 +1424,7 @@ function renderModalHitos(container, opo) {
         <div class="timeline-dot">6</div>
         <div class="timeline-content">
           <h4>6. Celebración del Ejercicio y Calificaciones</h4>
-          <p>Realización de la prueba, plantilla correctora y lista de aprobados.</p>
+          <p>Realización de las pruebas, plantilla correctora y lista de aprobados.</p>
         </div>
       </div>
     </div>
@@ -1389,11 +1432,11 @@ function renderModalHitos(container, opo) {
     <!-- Caja de Notificación de Alertas -->
     <div class="alert-toggle-box">
       <div class="alert-toggle-text">
-        <strong>🔔 Avisarme de cambios y fecha de examen</strong>
-        <span>Recibe una alerta inmediata cuando se publique la fecha de examen o listas en el boletín.</span>
+        <strong>Notificar cambios y fecha de examen en este terminal</strong>
+        <span>Recibirás una alerta cuando el tribunal publique listas o determine la fecha oficial de examen.</span>
       </div>
       <div>
-        <label class="switch" style="cursor: pointer;">
+        <label class="switch">
           <input type="checkbox" id="notif-toggle-input" ${isNotifActive ? 'checked' : ''} onchange="toggleOpoNotification('${opo.id}')">
         </label>
       </div>
@@ -1402,10 +1445,12 @@ function renderModalHitos(container, opo) {
     <!-- Enlaces directos oficiales -->
     <div style="display: flex; gap: 8px; margin-top: 16px;">
       <a href="${opo.urlOficial}" target="_blank" rel="noopener" class="btn btn-outline btn-block" style="text-align: center; font-size: 13px;">
-        🌐 Ficha en ${opo.boletin || 'BOE'}
+        <svg class="icon-inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        <span>Ficha en ${opo.boletin || 'BOE'}</span>
       </a>
       <a href="${opo.urlPdf}" target="_blank" rel="noopener" class="btn btn-primary btn-block" style="text-align: center; font-size: 13px;">
-        📥 Descargar Bases PDF
+        <svg class="icon-inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="12" y2="18"></line><line x1="15" y1="15" x2="12" y2="18"></line></svg>
+        <span>Bases Oficiales PDF</span>
       </a>
     </div>
   `;
@@ -1422,9 +1467,9 @@ function toggleOpoNotification(id) {
     if ('Notification' in window && Notification.permission !== 'granted') {
       Notification.requestPermission();
     }
-    showToast('🔔 Alerta activada: te avisaremos de la fecha de examen');
+    showToast('Aviso de examen activado en este terminal');
   } else {
-    showToast('Alerta desactivada');
+    showToast('Aviso de examen desactivado');
   }
 }
 
@@ -1727,4 +1772,84 @@ function getTemarioForOposicion(opo) {
     }
   ];
 }
+
+// --- 15. Sistema de Avisos en el Terminal ---
+function initTerminalAlertsUI() {
+  const savedToggle = document.getElementById('terminal-notif-saved');
+  const appToggle = document.getElementById('terminal-notif-app');
+  
+  if (savedToggle) {
+    savedToggle.checked = localStorage.getItem('opofinder_terminal_saved') !== 'false';
+  }
+  if (appToggle) {
+    appToggle.checked = localStorage.getItem('opofinder_terminal_app') !== 'false';
+  }
+
+  updateTerminalPermissionBadge();
+}
+
+function updateTerminalPermissionBadge() {
+  const badge = document.getElementById('terminal-permission-badge');
+  if (!badge) return;
+
+  if (!('Notification' in window)) {
+    badge.textContent = 'No soportado';
+    badge.className = 'badge badge-region';
+  } else if (Notification.permission === 'granted') {
+    badge.textContent = 'Autorizado (Activo)';
+    badge.className = 'badge badge-convocatoria';
+  } else if (Notification.permission === 'denied') {
+    badge.textContent = 'Bloqueado en el navegador';
+    badge.className = 'badge';
+    badge.style.color = 'var(--danger)';
+  } else {
+    badge.textContent = 'Pendiente de autorización';
+    badge.className = 'badge badge-region';
+  }
+}
+
+function toggleTerminalSetting(type, isChecked) {
+  if (type === 'saved') {
+    localStorage.setItem('opofinder_terminal_saved', isChecked ? 'true' : 'false');
+    showToast(isChecked ? 'Avisos de convocatorias guardadas activados en este terminal' : 'Avisos de convocatorias desactivados');
+  } else if (type === 'app') {
+    localStorage.setItem('opofinder_terminal_app', isChecked ? 'true' : 'false');
+    showToast(isChecked ? 'Avisos de novedades del sistema activados en este terminal' : 'Avisos de novedades desactivados');
+  }
+
+  if (isChecked && 'Notification' in window && Notification.permission !== 'granted') {
+    Notification.requestPermission().then(() => updateTerminalPermissionBadge());
+  }
+}
+
+async function sendTerminalTestAlert() {
+  if (!('Notification' in window)) {
+    alert('Tu terminal o navegador actual no soporta la API de Notificaciones.');
+    return;
+  }
+
+  let perm = Notification.permission;
+  if (perm !== 'granted') {
+    perm = await Notification.requestPermission();
+    updateTerminalPermissionBadge();
+  }
+
+  if (perm === 'granted') {
+    if (navigator.vibrate) {
+      navigator.vibrate([100, 50, 100]);
+    }
+    
+    new Notification('OpoFinder • Terminal Vinculado', {
+      body: 'Canal de avisos operativo. Recibirás alertas inmediatas de cambios en tus oposiciones guardadas y novedades oficiales.',
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      tag: 'opofinder-test-alert'
+    });
+
+    showToast('Aviso de prueba enviado a este terminal con éxito');
+  } else {
+    showToast('Permiso de notificaciones no concedido');
+  }
+}
+
 
