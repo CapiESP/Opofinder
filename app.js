@@ -225,7 +225,215 @@ function switchTab(tabName) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// --- 6. Consulta a la API Oficial del BOE ---
+// --- Dataset de Convocatorias Autonómicas y OEPs (BOC, etc.) ---
+const CCAA_PRELOADED_DATA = [
+  {
+    id: 'BOC-2026-148',
+    titulo: 'Auxiliar Administrativo (Subgrupo C2)',
+    organismo: 'Gobierno de Cantabria',
+    categoria: 'C2',
+    region: 'Cantabria',
+    plazas: 71,
+    tipo: 'Convocatoria',
+    boletin: 'BOC',
+    fechaPublicacion: '01/10/2026',
+    fechaRaw: '20261001',
+    plazoLimite: '21/10/2026',
+    diasRestantes: 15,
+    estadoPlazo: 'abierto',
+    urlOficial: 'https://boc.cantabria.es',
+    urlPdf: 'https://aplicacionesweb.cantabria.es/opecan/'
+  },
+  {
+    id: 'BOC-2026-149',
+    titulo: 'Auxiliar Administrativo (Promoción Interna)',
+    organismo: 'Gobierno de Cantabria',
+    categoria: 'C2',
+    region: 'Cantabria',
+    plazas: 4,
+    tipo: 'Convocatoria',
+    boletin: 'BOC',
+    fechaPublicacion: '01/10/2026',
+    fechaRaw: '20261001',
+    plazoLimite: '21/10/2026',
+    diasRestantes: 15,
+    estadoPlazo: 'abierto',
+    urlOficial: 'https://boc.cantabria.es',
+    urlPdf: 'https://aplicacionesweb.cantabria.es/opecan/'
+  },
+  {
+    id: 'BOC-2026-SANTONA',
+    titulo: 'Auxiliar Administrativo de Administración General',
+    organismo: 'Ayuntamiento de Santoña (Cantabria)',
+    categoria: 'C2',
+    region: 'Cantabria',
+    plazas: 1,
+    tipo: 'Convocatoria',
+    boletin: 'BOC',
+    fechaPublicacion: '28/09/2026',
+    fechaRaw: '20260928',
+    plazoLimite: '18/10/2026',
+    diasRestantes: 12,
+    estadoPlazo: 'abierto',
+    urlOficial: 'https://boc.cantabria.es',
+    urlPdf: 'https://boc.cantabria.es'
+  },
+  {
+    id: 'BOC-2026-BAREYO',
+    titulo: 'Auxiliar Administrativo',
+    organismo: 'Ayuntamiento de Bareyo (Cantabria)',
+    categoria: 'C2',
+    region: 'Cantabria',
+    plazas: 1,
+    tipo: 'Oferta OEP',
+    boletin: 'BOC',
+    fechaPublicacion: '01/06/2026',
+    fechaRaw: '20260601',
+    plazoLimite: 'Pendiente de convocatoria',
+    diasRestantes: 99,
+    estadoPlazo: 'abierto',
+    urlOficial: 'https://boc.cantabria.es',
+    urlPdf: 'https://boc.cantabria.es'
+  },
+  {
+    id: 'BOC-2026-LIEBANA',
+    titulo: 'Auxiliar de Enfermería',
+    organismo: 'Ayuntamiento de Cabezón de Liébana (Cantabria)',
+    categoria: 'C2',
+    region: 'Cantabria',
+    plazas: 2,
+    tipo: 'Oferta OEP',
+    boletin: 'BOC',
+    fechaPublicacion: '13/05/2026',
+    fechaRaw: '20260513',
+    plazoLimite: 'Pendiente de convocatoria',
+    diasRestantes: 99,
+    estadoPlazo: 'abierto',
+    urlOficial: 'https://boc.cantabria.es',
+    urlPdf: 'https://boc.cantabria.es'
+  },
+  {
+    id: 'BOC-2026-BUELNA',
+    titulo: 'Auxiliar Administrativo',
+    organismo: 'Ayuntamiento de San Felices de Buelna',
+    categoria: 'C2',
+    region: 'Cantabria',
+    plazas: 1,
+    tipo: 'Oferta OEP',
+    boletin: 'BOC',
+    fechaPublicacion: '13/04/2026',
+    fechaRaw: '20260413',
+    plazoLimite: 'Pendiente de convocatoria',
+    diasRestantes: 99,
+    estadoPlazo: 'abierto',
+    urlOficial: 'https://boc.cantabria.es',
+    urlPdf: 'https://boc.cantabria.es'
+  },
+  {
+    id: 'BOC-2026-SANTILLANA',
+    titulo: 'Auxiliar Administrativo',
+    organismo: 'Ayuntamiento de Santillana del Mar (Cantabria)',
+    categoria: 'C2',
+    region: 'Cantabria',
+    plazas: 1,
+    tipo: 'Oferta OEP',
+    boletin: 'BOC',
+    fechaPublicacion: '13/04/2026',
+    fechaRaw: '20260413',
+    plazoLimite: 'Pendiente de convocatoria',
+    diasRestantes: 99,
+    estadoPlazo: 'abierto',
+    urlOficial: 'https://boc.cantabria.es',
+    urlPdf: 'https://boc.cantabria.es'
+  },
+  {
+    id: 'BOC-2026-ALTAMIRA',
+    titulo: 'Auxiliar Administrativo',
+    organismo: 'Mancomunidad Altamira Los Valles (Cantabria)',
+    categoria: 'C2',
+    region: 'Cantabria',
+    plazas: 1,
+    tipo: 'Oferta OEP',
+    boletin: 'BOC',
+    fechaPublicacion: '10/04/2026',
+    fechaRaw: '20260410',
+    plazoLimite: 'Pendiente de convocatoria',
+    diasRestantes: 99,
+    estadoPlazo: 'abierto',
+    urlOficial: 'https://boc.cantabria.es',
+    urlPdf: 'https://boc.cantabria.es'
+  },
+  {
+    id: 'BOC-2026-SALUD',
+    titulo: 'Auxiliar Administrativo Servicios de Salud',
+    organismo: 'Servicio Cántabro de Salud (SCS)',
+    categoria: 'C2',
+    region: 'Cantabria',
+    plazas: 25,
+    tipo: 'Oferta OEP',
+    boletin: 'BOC',
+    fechaPublicacion: '09/01/2026',
+    fechaRaw: '20260109',
+    plazoLimite: 'Pendiente de convocatoria',
+    diasRestantes: 99,
+    estadoPlazo: 'abierto',
+    urlOficial: 'https://boc.cantabria.es',
+    urlPdf: 'https://boc.cantabria.es'
+  },
+  {
+    id: 'BOC-2026-CASTRO',
+    titulo: 'Auxiliar Administrativo',
+    organismo: 'Ayuntamiento de Castro Urdiales (Cantabria)',
+    categoria: 'C2',
+    region: 'Cantabria',
+    plazas: 1,
+    tipo: 'Oferta OEP',
+    boletin: 'BOC',
+    fechaPublicacion: '07/01/2026',
+    fechaRaw: '20260107',
+    plazoLimite: 'Pendiente de convocatoria',
+    diasRestantes: 99,
+    estadoPlazo: 'abierto',
+    urlOficial: 'https://boc.cantabria.es',
+    urlPdf: 'https://boc.cantabria.es'
+  },
+  {
+    id: 'BOC-2025-SUANCES',
+    titulo: 'Auxiliar Administrativo',
+    organismo: 'Ayuntamiento de Suances (Cantabria)',
+    categoria: 'C2',
+    region: 'Cantabria',
+    plazas: 1,
+    tipo: 'Oferta OEP',
+    boletin: 'BOC',
+    fechaPublicacion: '03/12/2025',
+    fechaRaw: '20251203',
+    plazoLimite: 'Pendiente de convocatoria',
+    diasRestantes: 99,
+    estadoPlazo: 'abierto',
+    urlOficial: 'https://boc.cantabria.es',
+    urlPdf: 'https://boc.cantabria.es'
+  },
+  {
+    id: 'BOC-2025-RIBAMONTAN',
+    titulo: 'Auxiliar Administrativo',
+    organismo: 'Ayuntamiento de Ribamontán al Mar',
+    categoria: 'C2',
+    region: 'Cantabria',
+    plazas: 1,
+    tipo: 'Oferta OEP',
+    boletin: 'BOC',
+    fechaPublicacion: '27/11/2025',
+    fechaRaw: '20251127',
+    plazoLimite: 'Pendiente de convocatoria',
+    diasRestantes: 99,
+    estadoPlazo: 'abierto',
+    urlOficial: 'https://boc.cantabria.es',
+    urlPdf: 'https://boc.cantabria.es'
+  }
+];
+
+// --- 6. Consulta Conjunta (BOE + Boletines Autonómicos y OEPs) ---
 async function searchBOE() {
   const container = document.getElementById('results-container');
   
@@ -233,14 +441,51 @@ async function searchBOE() {
   container.innerHTML = `
     <div class="loading-container">
       <div class="spinner"></div>
-      <p>Consultando la API oficial del BOE...</p>
+      <p>Cargando convocatorias del BOE y boletines autonómicos...</p>
     </div>
   `;
   
   const daysRange = parseInt(document.getElementById('filter-days').value) || 7;
   const dates = getDatesList(daysRange);
   let allOpos = [];
-  
+
+  // 1. Cargar convocatorias autonómicas preconfiguradas
+  allOpos.push(...CCAA_PRELOADED_DATA);
+
+  // 2. Cargar convocatorias adicionales desde Supabase si la tabla existe
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { data: dbData, error } = await client.from('convocatorias').select('*');
+      if (!error && dbData && dbData.length > 0) {
+        for (const item of dbData) {
+          if (!allOpos.some(o => o.id === item.id)) {
+            allOpos.push({
+              id: item.id,
+              titulo: item.titulo,
+              organismo: item.organismo,
+              categoria: item.categoria,
+              region: item.region,
+              plazas: item.plazas || 1,
+              tipo: item.tipo || 'Convocatoria',
+              boletin: item.boletin || 'BOC',
+              fechaPublicacion: item.fecha_publicacion,
+              fechaRaw: item.fecha_publicacion.replace(/\//g, ''),
+              plazoLimite: item.plazo_limite || 'Pendiente',
+              diasRestantes: item.dias_restantes ?? 15,
+              estadoPlazo: item.estado_plazo || 'abierto',
+              urlPdf: item.url_pdf || '',
+              urlOficial: item.url_oficial || ''
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Convocatorias en Supabase no disponibles o aún no sincronizadas:', e);
+    }
+  }
+
+  // 3. Cargar en vivo desde la API del BOE
   for (const dateStr of dates) {
     try {
       const url = `https://www.boe.es/datosabiertos/api/boe/sumario/${dateStr}`;
@@ -257,7 +502,7 @@ async function searchBOE() {
         const secciones = d?.seccion || [];
         for (const sec of (Array.isArray(secciones) ? secciones : [secciones])) {
           const secCode = sec?.['@codigo'] || sec?.codigo;
-          if (secCode === '2B') { // Sección 2B: Oposiciones y concursos
+          if (secCode === '2B') {
             const deps = sec?.departamento || [];
             for (const dep of (Array.isArray(deps) ? deps : [deps])) {
               const depName = dep?.['@nombre'] || dep?.nombre || 'Administración Pública';
@@ -266,7 +511,7 @@ async function searchBOE() {
                 const items = epi?.item || [];
                 for (const item of (Array.isArray(items) ? items : [items])) {
                   const processed = processBoeItem(item, depName, dateStr);
-                  if (processed) {
+                  if (processed && !allOpos.some(o => o.id === processed.id)) {
                     allOpos.push(processed);
                   }
                 }
@@ -317,6 +562,9 @@ function processBoeItem(item, depName, dateStr) {
     organismo: depName,
     categoria,
     region,
+    plazas: 1,
+    tipo: 'Convocatoria',
+    boletin: 'BOE',
     fechaPublicacion: formatDate(dateStr),
     fechaRaw: dateStr,
     plazoLimite: deadlineInfo.formattedDate,
@@ -427,17 +675,29 @@ function calculateDeadline(dateStr) {
 function applyFiltersAndRender() {
   const selectedCat = document.getElementById('filter-category').value;
   const selectedRegion = document.getElementById('filter-region').value;
+  const selectedType = document.getElementById('filter-type')?.value || 'TODOS';
   const searchKeyword = document.getElementById('filter-search').value.toLowerCase().trim();
   const hideExpired = document.getElementById('filter-hide-expired').checked;
   
   let filtered = state.oposiciones.filter(item => {
+    // 1. Filtro por Categoría
     if (selectedCat !== 'TODAS' && item.categoria !== selectedCat) return false;
+    
+    // 2. Filtro por Región
     if (selectedRegion !== 'TODAS' && item.region !== selectedRegion) return false;
+    
+    // 3. Filtro por Tipo de Proceso (Convocatoria vs Oferta OEP)
+    if (selectedType !== 'TODOS' && item.tipo !== selectedType) return false;
+    
+    // 4. Filtro por Palabra Clave
     if (searchKeyword) {
       const matchText = `${item.titulo} ${item.organismo}`.toLowerCase();
       if (!matchText.includes(searchKeyword)) return false;
     }
-    if (hideExpired && item.diasRestantes < 0) return false;
+    
+    // 5. Omitir caducadas (solo aplica si es Convocatoria cerrada)
+    if (hideExpired && item.tipo === 'Convocatoria' && item.diasRestantes < 0) return false;
+    
     return true;
   });
   
@@ -470,7 +730,9 @@ function createCardHTML(item) {
   const isSaved = state.guardadas.some(g => g.id === item.id);
   
   let trafficHtml = '';
-  if (item.diasRestantes < 0) {
+  if (item.tipo === 'Oferta OEP') {
+    trafficHtml = `<span class="traffic-light traffic-green">📋 Oferta OEP Aprobada (Pendiente Convocatoria)</span>`;
+  } else if (item.diasRestantes < 0) {
     trafficHtml = `<span class="traffic-light traffic-red">🔴 Plazo finalizado</span>`;
   } else if (item.diasRestantes === 0) {
     trafficHtml = `<span class="traffic-light traffic-red">🔴 ¡Último día hoy!</span>`;
@@ -480,12 +742,19 @@ function createCardHTML(item) {
     trafficHtml = `<span class="traffic-light traffic-green">🟢 Quedan ${item.diasRestantes} días hábiles</span>`;
   }
   
+  const boletinName = item.boletin || 'BOE';
+  const plazasText = item.plazas ? `${item.plazas} ${item.plazas === 1 ? 'plaza' : 'plazas'}` : '';
+  const tipoBadgeClass = item.tipo === 'Oferta OEP' ? 'badge-oep' : 'badge-convocatoria';
+  
   return `
     <div class="opo-card ${isSaved ? 'saved-highlight' : ''}" id="card-${item.id}">
       <div class="card-top">
         <div class="badges-row">
+          <span class="badge ${tipoBadgeClass}">${item.tipo || 'Convocatoria'}</span>
           <span class="badge badge-${item.categoria.toLowerCase()}">${item.categoria}</span>
           <span class="badge badge-region">${item.region}</span>
+          ${plazasText ? `<span class="badge badge-plazas">${plazasText}</span>` : ''}
+          <span class="badge badge-boletin">${boletinName}</span>
         </div>
         <button class="btn-bookmark ${isSaved ? 'active' : ''}" onclick="toggleBookmark('${item.id}')" title="${isSaved ? 'Desmarcar y borrar de tu cuenta' : 'Guardar oposición'}">
           ${isSaved ? '★' : '☆'}
@@ -497,15 +766,15 @@ function createCardHTML(item) {
       
       <div class="card-meta-grid">
         <div class="meta-item">
-          <span class="meta-label">Publicado en BOE:</span>
+          <span class="meta-label">Publicado en ${boletinName}:</span>
           <span class="meta-value">${item.fechaPublicacion}</span>
         </div>
         <div class="meta-item">
-          <span class="meta-label">Plazo estimado instancias:</span>
-          <span class="meta-value">${item.plazoLimite}</span>
+          <span class="meta-label">Plazo de solicitudes:</span>
+          <span class="meta-value">${item.plazoLimite || 'Ver bases'}</span>
         </div>
         <div class="meta-item">
-          <span class="meta-label">Estado de la convocatoria:</span>
+          <span class="meta-label">Estado del proceso:</span>
           <div class="meta-value">${trafficHtml}</div>
         </div>
         <div class="meta-item">
@@ -516,10 +785,10 @@ function createCardHTML(item) {
       
       <div class="card-actions">
         <a href="${item.urlOficial}" target="_blank" rel="noopener" class="btn btn-outline btn-sm">
-          🌐 Ver en BOE.es
+          🌐 Ver en ${boletinName}
         </a>
         <a href="${item.urlPdf}" target="_blank" rel="noopener" download="${item.id}.pdf" class="btn-download-pdf">
-          📥 Descargar PDF Oficial
+          📥 Descargar Bases Oficiales
         </a>
       </div>
     </div>
@@ -856,6 +1125,7 @@ async function requestNotificationPermission() {
 function setupEventListeners() {
   document.getElementById('filter-category').addEventListener('change', applyFiltersAndRender);
   document.getElementById('filter-region').addEventListener('change', applyFiltersAndRender);
+  document.getElementById('filter-type')?.addEventListener('change', applyFiltersAndRender);
   document.getElementById('filter-hide-expired').addEventListener('change', applyFiltersAndRender);
   document.getElementById('filter-search').addEventListener('input', applyFiltersAndRender);
   document.getElementById('filter-days').addEventListener('change', searchBOE);

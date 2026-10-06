@@ -1,5 +1,5 @@
-// OpoFinder - Service Worker v2 (Estrategia Network-First para actualizaciones inmediatas)
-const CACHE_NAME = 'opofinder-cache-v2';
+// OpoFinder - Service Worker v3 (Network-First + CCAA Support)
+const CACHE_NAME = 'opofinder-cache-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

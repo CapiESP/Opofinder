@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" href="icon-192.png">
   
   <!-- Estilos Mobile-First -->
-  <link rel="stylesheet" href="styles.css?v=2">
+  <link rel="stylesheet" href="styles.css?v=3">
   
   <!-- Supabase JS Client (v2) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -175,6 +175,16 @@
               <input type="text" id="filter-search" class="form-control" placeholder="Ej: Auxiliar, Informática, Policía...">
             </div>
 
+            <!-- Tipo de Proceso (Convocatorias vs OEPs) -->
+            <div class="form-group">
+              <label for="filter-type">Tipo de Proceso</label>
+              <select id="filter-type" class="form-control">
+                <option value="TODOS">Todos (Convocatorias + Ofertas OEP)</option>
+                <option value="Convocatoria">Solo Convocatorias (Plazo abierto)</option>
+                <option value="Oferta OEP">Solo Ofertas (OEP pendientes)</option>
+              </select>
+            </div>
+
           </div>
 
           <!-- Checkbox para Omitir Caducadas -->
@@ -296,6 +306,6 @@
   </div>
 
   <!-- Script Principal -->
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
