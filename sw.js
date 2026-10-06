@@ -1,5 +1,5 @@
-// OpoFinder - Service Worker para PWA y Notificaciones
-const CACHE_NAME = 'opofinder-cache-v1';
+// OpoFinder - Service Worker v2 (Estrategia Network-First para actualizaciones inmediatas)
+const CACHE_NAME = 'opofinder-cache-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -11,46 +11,61 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting(); // Activar inmediatamente sin esperar
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE).catch((err) => {
-        console.warn('Algunos recursos no pudieron cachearse durante install:', err);
+        console.warn('Advertencia en precache:', err);
       });
     })
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
+  // Limpiar cachés antiguas inmediatamente
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
+            console.log('Eliminando caché antigua:', key);
             return caches.delete(key);
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // Evitar cachear peticiones dinámicas de la API del BOE o Supabase
+  // Las llamadas a APIs externas (BOE, Supabase) van directas a la red
   if (event.request.url.includes('boe.es') || event.request.url.includes('supabase.co')) {
     return;
   }
 
+  // Estrategia Network-First para archivos propios de la app:
+  // Intenta descargar la última versión de la red. Si no hay conexión, usa la caché.
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      return cachedResponse || fetch(event.request).catch(() => {
-        // En caso de fallo de red, intentar servir index.html
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
         }
-      });
-    })
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          if (event.request.mode === 'navigate') {
+            return caches.match('./index.html');
+          }
+        });
+      })
   );
 });
 

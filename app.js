@@ -11,14 +11,20 @@ let supabaseClient = null;
 let currentUser = null;
 let authMode = 'login'; // 'login' o 'register'
 
-try {
-  if (window.supabase) {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    console.log('Supabase Auth inicializado.');
+function getSupabaseClient() {
+  if (!supabaseClient && window.supabase) {
+    try {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      console.log('Supabase Auth inicializado.');
+    } catch (e) {
+      console.error('Error al instanciar Supabase:', e);
+    }
   }
-} catch (err) {
-  console.error('Error al inicializar Supabase:', err);
+  return supabaseClient;
 }
+
+// Inicialización inmediata si ya está disponible
+getSupabaseClient();
 
 // --- 2. Estado de la Aplicación ---
 const state = {
@@ -36,14 +42,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   registerServiceWorker();
 
-  // Escuchar cambios de sesión en Supabase
-  if (supabaseClient) {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    handleAuthState(session);
+  // Asegurar que la pantalla de login esté visible por defecto mientras se comprueba la sesión
+  handleAuthState(null);
 
-    supabaseClient.auth.onAuthStateChange((_event, session) => {
-      handleAuthState(session);
-    });
+  // Esperar brevemente a que el SDK de Supabase cargue si la red es lenta
+  let client = getSupabaseClient();
+  let retries = 0;
+  while (!client && retries < 20) {
+    await new Promise(r => setTimeout(r, 100));
+    client = getSupabaseClient();
+    retries++;
+  }
+
+  // Escuchar cambios de sesión en Supabase
+  if (client) {
+    try {
+      const { data } = await client.auth.getSession();
+      handleAuthState(data?.session || null);
+
+      client.auth.onAuthStateChange((_event, session) => {
+        handleAuthState(session);
+      });
+    } catch (e) {
+      console.warn('Error verificando sesión:', e);
+      handleAuthState(null);
+    }
+  } else {
+    console.warn('Librería de Supabase no disponible en este momento.');
+    handleAuthState(null);
   }
 });
 
@@ -82,12 +108,15 @@ async function handleAuthSubmit(e) {
   alertEl.style.display = 'none';
 
   try {
+    const client = getSupabaseClient();
+    if (!client) throw new Error('No se pudo conectar con el servidor de autenticación');
+
     if (authMode === 'login') {
-      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      const { data, error } = await client.auth.signInWithPassword({ email, password });
       if (error) throw error;
       showToast('¡Bienvenido de nuevo!');
     } else {
-      const { data, error } = await supabaseClient.auth.signUp({ email, password });
+      const { data, error } = await client.auth.signUp({ email, password });
       if (error) throw error;
       
       if (data?.session) {
@@ -115,12 +144,14 @@ async function handleAuthSubmit(e) {
 
 async function handleLogout() {
   if (confirm('¿Deseas cerrar tu sesión?')) {
-    if (supabaseClient) {
-      await supabaseClient.auth.signOut();
+    const client = getSupabaseClient();
+    if (client) {
+      await client.auth.signOut();
     }
     currentUser = null;
     state.guardadas = [];
     state.filtrosGuardados = [];
+    handleAuthState(null);
     showToast('Sesión cerrada');
   }
 }
@@ -797,7 +828,7 @@ async function deleteFilter(id) {
 // --- 11. Service Worker & Notificaciones PWA ---
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=2').catch(err => {
       console.warn('Fallo SW:', err);
     });
   }
