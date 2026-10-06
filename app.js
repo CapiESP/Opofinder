@@ -29,15 +29,18 @@ getSupabaseClient();
 // --- 2. Estado de la Aplicación ---
 const state = {
   currentTab: 'buscador', // 'buscador', 'guardadas', 'filtros', 'ayuda'
-  oposiciones: [],        // Convocatorias cargadas desde el BOE
+  oposiciones: [],        // Convocatorias cargadas desde el BOE y CCAA
   guardadas: [],          // Oposiciones marcadas por el usuario actual
   filtrosGuardados: [],   // Filtros de alerta del usuario actual
   loading: false,
-  alertCount: 0
+  alertCount: 0,
+  currentModalOpo: null,  // Oposición actualmente abierta en el modal
+  currentModalTab: 'hitos'// 'hitos', 'temario', 'notas'
 };
 
 // --- 3. Inicialización al Cargar el DOM ---
 document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
   setupNavigation();
   setupEventListeners();
   registerServiceWorker();
@@ -747,7 +750,7 @@ function createCardHTML(item) {
   const tipoBadgeClass = item.tipo === 'Oferta OEP' ? 'badge-oep' : 'badge-convocatoria';
   
   return `
-    <div class="opo-card ${isSaved ? 'saved-highlight' : ''}" id="card-${item.id}">
+    <div class="opo-card ${isSaved ? 'saved-highlight' : ''}" id="card-${item.id}" onclick="openDetailModal('${item.id}')">
       <div class="card-top">
         <div class="badges-row">
           <span class="badge ${tipoBadgeClass}">${item.tipo || 'Convocatoria'}</span>
@@ -756,7 +759,7 @@ function createCardHTML(item) {
           ${plazasText ? `<span class="badge badge-plazas">${plazasText}</span>` : ''}
           <span class="badge badge-boletin">${boletinName}</span>
         </div>
-        <button class="btn-bookmark ${isSaved ? 'active' : ''}" onclick="toggleBookmark('${item.id}')" title="${isSaved ? 'Desmarcar y borrar de tu cuenta' : 'Guardar oposición'}">
+        <button class="btn-bookmark ${isSaved ? 'active' : ''}" onclick="event.stopPropagation(); toggleBookmark('${item.id}')" title="${isSaved ? 'Desmarcar y borrar de tu cuenta' : 'Guardar oposición'}">
           ${isSaved ? '★' : '☆'}
         </button>
       </div>
@@ -784,11 +787,14 @@ function createCardHTML(item) {
       </div>
       
       <div class="card-actions">
-        <a href="${item.urlOficial}" target="_blank" rel="noopener" class="btn btn-outline btn-sm">
+        <button class="btn-view-detail" onclick="event.stopPropagation(); openDetailModal('${item.id}')">
+          📖 Temario & Hitos
+        </button>
+        <a href="${item.urlOficial}" target="_blank" rel="noopener" onclick="event.stopPropagation();" class="btn btn-outline btn-sm">
           🌐 Ver en ${boletinName}
         </a>
-        <a href="${item.urlPdf}" target="_blank" rel="noopener" download="${item.id}.pdf" class="btn-download-pdf">
-          📥 Descargar Bases Oficiales
+        <a href="${item.urlPdf}" target="_blank" rel="noopener" download="${item.id}.pdf" onclick="event.stopPropagation();" class="btn-download-pdf">
+          📥 Bases Oficiales
         </a>
       </div>
     </div>
@@ -1097,7 +1103,7 @@ async function deleteFilter(id) {
 // --- 11. Service Worker & Notificaciones PWA ---
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=2').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=4').catch(err => {
       console.warn('Fallo SW:', err);
     });
   }
@@ -1205,3 +1211,520 @@ function showToast(message) {
     setTimeout(() => { toast.style.display = 'none'; }, 300);
   }, 2500);
 }
+
+// --- 13. Modo Claro / Oscuro Institucional ---
+function initTheme() {
+  const savedTheme = localStorage.getItem('opofinder_theme');
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+  applyTheme(theme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const newTheme = current === 'dark' ? 'light' : 'dark';
+  applyTheme(newTheme);
+  localStorage.setItem('opofinder_theme', newTheme);
+  showToast(`Modo ${newTheme === 'dark' ? 'Oscuro' : 'Claro'} activado`);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const toggleBtn = document.getElementById('theme-toggle');
+  if (toggleBtn) {
+    toggleBtn.innerHTML = theme === 'dark' ? '☀️' : '🌙';
+    toggleBtn.title = theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
+  }
+}
+
+// --- 14. Modal de Detalle, Hitos & Temario ---
+function openDetailModal(id) {
+  const opo = state.oposiciones.find(o => o.id === id) || state.guardadas.find(g => g.id === id);
+  if (!opo) return;
+
+  state.currentModalOpo = opo;
+  state.currentModalTab = 'hitos';
+
+  const titleEl = document.getElementById('modal-opo-title');
+  const orgEl = document.getElementById('modal-opo-organismo');
+  if (titleEl) titleEl.textContent = opo.titulo;
+  if (orgEl) orgEl.textContent = `🏛️ ${opo.organismo} • ${opo.region} • ${opo.categoria}`;
+
+  document.querySelectorAll('.modal-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-modaltab') === 'hitos');
+  });
+
+  renderModalContent();
+
+  const modal = document.getElementById('detail-modal');
+  if (modal) {
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeDetailModal() {
+  const modal = document.getElementById('detail-modal');
+  if (modal) {
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+  state.currentModalOpo = null;
+}
+
+function handleModalOverlayClick(e) {
+  if (e.target && e.target.id === 'detail-modal') {
+    closeDetailModal();
+  }
+}
+
+function switchModalTab(tabName) {
+  state.currentModalTab = tabName;
+  document.querySelectorAll('.modal-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-modaltab') === tabName);
+  });
+  renderModalContent();
+}
+
+function renderModalContent() {
+  const container = document.getElementById('modal-opo-body');
+  const opo = state.currentModalOpo;
+  if (!container || !opo) return;
+
+  if (state.currentModalTab === 'hitos') {
+    renderModalHitos(container, opo);
+  } else if (state.currentModalTab === 'temario') {
+    renderModalTemario(container, opo);
+  } else if (state.currentModalTab === 'notas') {
+    renderModalNotas(container, opo);
+  }
+}
+
+function renderModalHitos(container, opo) {
+  const notifKey = `opofinder_notif_${opo.id}`;
+  const isNotifActive = localStorage.getItem(notifKey) === 'true';
+  const isOep = opo.tipo === 'Oferta OEP';
+  const isCerrado = !isOep && opo.diasRestantes < 0;
+
+  container.innerHTML = `
+    <!-- Resumen del Estado -->
+    <div style="background: var(--bg-subtle); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; border: 1px solid var(--border);">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+        <span style="font-size: 13px; font-weight: 700; color: var(--text-main);">
+          ${isOep ? '📋 Oferta de Empleo Público' : '📄 Convocatoria Oficial'}
+        </span>
+        <span class="badge ${isOep ? 'badge-oep' : 'badge-convocatoria'}">
+          ${isOep ? 'OEP Aprobada' : (isCerrado ? 'Plazo Cerrado' : `Plazo Abierto (${opo.diasRestantes} días)`)}
+        </span>
+      </div>
+      <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+        Publicado en <strong>${opo.boletin || 'BOE'}</strong> el ${opo.fechaPublicacion}
+        ${opo.plazas ? `• <strong>${opo.plazas} plazas</strong>` : ''}
+      </div>
+    </div>
+
+    <!-- Timeline del Ciclo de Vida -->
+    <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--text-main);">
+      📍 Fases del Procedimiento Selectivo
+    </h4>
+
+    <div class="lifecycle-timeline">
+      <!-- Paso 1 -->
+      <div class="timeline-step completed">
+        <div class="timeline-dot">✓</div>
+        <div class="timeline-content">
+          <h4>1. Publicación de la OEP</h4>
+          <p>Aprobada en Consejo de Gobierno / Pleno Municipal.</p>
+        </div>
+      </div>
+
+      <!-- Paso 2 -->
+      <div class="timeline-step ${isOep ? 'current' : 'completed'}">
+        <div class="timeline-dot">${isOep ? '⏳' : '✓'}</div>
+        <div class="timeline-content">
+          <h4>2. Publicación de Bases y Convocatoria</h4>
+          <p>${isOep ? 'Pendiente de publicación en boletín oficial.' : `Publicado en ${opo.boletin || 'BOE'} (${opo.fechaPublicacion}).`}</p>
+        </div>
+      </div>
+
+      <!-- Paso 3 -->
+      <div class="timeline-step ${isOep ? '' : (isCerrado ? 'completed' : 'current')}">
+        <div class="timeline-dot">${isOep ? '3' : (isCerrado ? '✓' : '●')}</div>
+        <div class="timeline-content">
+          <h4>3. Plazo de Presentación de Instancias</h4>
+          <p>${isOep ? 'Se abrirá tras la publicación oficial.' : (isCerrado ? `Finalizado el ${opo.plazoLimite}` : `Abierto hasta el ${opo.plazoLimite} (quedan ${opo.diasRestantes} días)`)}</p>
+        </div>
+      </div>
+
+      <!-- Paso 4 -->
+      <div class="timeline-step">
+        <div class="timeline-dot">4</div>
+        <div class="timeline-content">
+          <h4>4. Listas Provisionales de Admitidos y Excluidos</h4>
+          <p>Publicación de listas y plazo de 10 días hábiles para subsanación.</p>
+        </div>
+      </div>
+
+      <!-- Paso 5: Clave Fecha de Examen -->
+      <div class="timeline-step" style="background: var(--gold-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--gold);">
+        <div class="timeline-dot" style="background: var(--gold); color: white;">🎯</div>
+        <div class="timeline-content">
+          <h4 style="color: var(--text-main);">5. Fecha de Examen y Distribución de Aulas</h4>
+          <p style="color: var(--text-main); font-weight: 500;">
+            ${opo.fechaExamen ? `📅 Fecha anunciada: <strong>${opo.fechaExamen}</strong>` : '⏳ Pendiente de resolución por el Tribunal Calificador.'}
+          </p>
+        </div>
+      </div>
+
+      <!-- Paso 6 -->
+      <div class="timeline-step">
+        <div class="timeline-dot">6</div>
+        <div class="timeline-content">
+          <h4>6. Celebración del Ejercicio y Calificaciones</h4>
+          <p>Realización de la prueba, plantilla correctora y lista de aprobados.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Caja de Notificación de Alertas -->
+    <div class="alert-toggle-box">
+      <div class="alert-toggle-text">
+        <strong>🔔 Avisarme de cambios y fecha de examen</strong>
+        <span>Recibe una alerta inmediata cuando se publique la fecha de examen o listas en el boletín.</span>
+      </div>
+      <div>
+        <label class="switch" style="cursor: pointer;">
+          <input type="checkbox" id="notif-toggle-input" ${isNotifActive ? 'checked' : ''} onchange="toggleOpoNotification('${opo.id}')">
+        </label>
+      </div>
+    </div>
+
+    <!-- Enlaces directos oficiales -->
+    <div style="display: flex; gap: 8px; margin-top: 16px;">
+      <a href="${opo.urlOficial}" target="_blank" rel="noopener" class="btn btn-outline btn-block" style="text-align: center; font-size: 13px;">
+        🌐 Ficha en ${opo.boletin || 'BOE'}
+      </a>
+      <a href="${opo.urlPdf}" target="_blank" rel="noopener" class="btn btn-primary btn-block" style="text-align: center; font-size: 13px;">
+        📥 Descargar Bases PDF
+      </a>
+    </div>
+  `;
+}
+
+function toggleOpoNotification(id) {
+  const notifKey = `opofinder_notif_${id}`;
+  const current = localStorage.getItem(notifKey) === 'true';
+  const next = !current;
+  
+  localStorage.setItem(notifKey, next ? 'true' : 'false');
+  
+  if (next) {
+    if ('Notification' in window && Notification.permission !== 'granted') {
+      Notification.requestPermission();
+    }
+    showToast('🔔 Alerta activada: te avisaremos de la fecha de examen');
+  } else {
+    showToast('Alerta desactivada');
+  }
+}
+
+function renderModalTemario(container, opo) {
+  const temario = getTemarioForOposicion(opo);
+  const checkedKey = `opofinder_temario_${opo.id}`;
+  let checkedTopics = [];
+  try {
+    checkedTopics = JSON.parse(localStorage.getItem(checkedKey) || '[]');
+  } catch(e){}
+
+  const totalTopics = temario.reduce((acc, b) => acc + b.temas.length, 0);
+  const completedTopics = checkedTopics.length;
+  const percent = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
+
+  let blocksHtml = temario.map((bloque, bIdx) => `
+    <div class="temario-block">
+      <div class="temario-block-header">
+        📖 ${escapeHTML(bloque.bloque)} (${bloque.temas.length} temas)
+      </div>
+      <div>
+        ${bloque.temas.map((tema, tIdx) => {
+          const topicId = `${bIdx}_${tIdx}`;
+          const isChecked = checkedTopics.includes(topicId);
+          return `
+            <label class="temario-item" style="cursor: pointer; background: ${isChecked ? 'var(--bg-subtle)' : 'transparent'};">
+              <input type="checkbox" class="temario-check" ${isChecked ? 'checked' : ''} onchange="toggleTopicCheck('${opo.id}', '${topicId}')">
+              <div style="flex: 1; ${isChecked ? 'text-decoration: line-through; color: var(--text-muted);' : ''}">
+                <span style="font-weight: 600;">Tema ${tIdx + 1}:</span> ${escapeHTML(tema)}
+              </div>
+            </label>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  container.innerHTML = `
+    <!-- Barra de Progreso del Estudio -->
+    <div style="background: var(--bg-subtle); padding: 14px; border-radius: 10px; margin-bottom: 16px; border: 1px solid var(--border);">
+      <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-bottom: 6px;">
+        <span>Progreso de estudio:</span>
+        <span>${completedTopics} de ${totalTopics} temas (${percent}%)</span>
+      </div>
+      <div style="width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
+        <div style="width: ${percent}%; height: 100%; background: var(--success); transition: width 0.3s ease;"></div>
+      </div>
+      <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+        Marca los temas conforme vayas completando vueltas de estudio o repasos. Tu progreso se guardará automáticamente.
+      </p>
+    </div>
+
+    ${blocksHtml}
+  `;
+}
+
+function toggleTopicCheck(opoId, topicId) {
+  const key = `opofinder_temario_${opoId}`;
+  let checked = [];
+  try {
+    checked = JSON.parse(localStorage.getItem(key) || '[]');
+  } catch(e){}
+
+  const idx = checked.indexOf(topicId);
+  if (idx !== -1) {
+    checked.splice(idx, 1);
+  } else {
+    checked.push(topicId);
+  }
+  localStorage.setItem(key, JSON.stringify(checked));
+
+  // Volver a renderizar temario para actualizar barra de progreso y tachados
+  const container = document.getElementById('modal-opo-body');
+  if (container && state.currentModalOpo) {
+    renderModalTemario(container, state.currentModalOpo);
+  }
+}
+
+function renderModalNotas(container, opo) {
+  const notesKey = `opofinder_notes_${opo.id}`;
+  const savedNotes = localStorage.getItem(notesKey) || opo.notas || '';
+
+  container.innerHTML = `
+    <div style="margin-bottom: 12px;">
+      <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 6px; color: var(--text-main);">
+        📝 Cuaderno de Estudio y Anotaciones
+      </h4>
+      <p style="font-size: 12px; color: var(--text-muted);">
+        Apunta aquí fechas estimadas de examen, enlaces de tu academia, dudas de leyes o recordatorios de presentación de méritos.
+      </p>
+    </div>
+
+    <textarea id="opo-notes-input" class="notes-textarea" placeholder="Escribe tus notas personales aquí...">${escapeHTML(savedNotes)}</textarea>
+
+    <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+      <button class="btn btn-primary btn-sm" onclick="saveOpoNotes('${opo.id}')">
+        💾 Guardar Notas
+      </button>
+    </div>
+  `;
+}
+
+async function saveOpoNotes(id) {
+  const input = document.getElementById('opo-notes-input');
+  if (!input) return;
+  const notes = input.value;
+  localStorage.setItem(`opofinder_notes_${id}`, notes);
+
+  if (state.currentModalOpo) {
+    state.currentModalOpo.notas = notes;
+  }
+
+  // Sincronizar en Supabase si está guardada
+  if (supabaseClient && currentUser) {
+    try {
+      await supabaseClient.from('oposiciones_guardadas')
+        .update({ notas: notes })
+        .eq('id', id)
+        .eq('user_id', currentUser.id);
+    } catch(e){}
+  }
+
+  showToast('Notas guardadas');
+}
+
+function getTemarioForOposicion(opo) {
+  const title = (opo.titulo || '').toLowerCase();
+  const cat = (opo.categoria || '').toUpperCase();
+  const org = (opo.organismo || '').toLowerCase();
+
+  // 1. Auxiliar Administrativo (C2)
+  if (title.includes('auxiliar') || cat === 'C2') {
+    return [
+      {
+        bloque: 'Bloque I: Organización Pública y Derecho Administrativo',
+        temas: [
+          'La Constitución Española de 1978: Principios generales, derechos y deberes fundamentales.',
+          'La Corona y las Cortes Generales: Composición, atribuciones y funcionamiento del Congreso y Senado.',
+          'El Gobierno y la Administración: Organización de la Administración General del Estado y de las CCAA.',
+          'El Acto Administrativo: Eficacia, nulidad, anulabilidad y régimen de notificaciones.',
+          'El Procedimiento Administrativo Común (Ley 39/2015): Fases de iniciación, ordenación, instrucción y finalización.',
+          'El Estatuto Básico del Empleado Público (TREBEP): Clases de personal, derechos, deberes y código de conducta.',
+          'Políticas de Igualdad de Género (Ley Orgánica 3/2007) y contra la Violencia de Género.',
+          'Régimen Local y Autonómico aplicable al organismo convocante.'
+        ]
+      },
+      {
+        bloque: 'Bloque II: Actividad Administrativa y Ofimática',
+        temas: [
+          'Atención a la ciudadanía: Información administrativa y servicios de registro.',
+          'Los documentos administrativos: Registro electrónico, archivo y clasificación de expedientes.',
+          'Informática básica: Conceptos de hardware, software y sistemas operativos modernos.',
+          'Procesador de textos: Configuración de página, formatos de párrafo, tablas y combinación de correspondencia.',
+          'Hoja de cálculo: Fórmulas fundamentales, funciones condicionales y formato de celdas.',
+          'Administración Electrónica: Sede electrónica, certificado digital y firma electrónica (Ley 40/2015).'
+        ]
+      }
+    ];
+  }
+
+  // 2. Administrativo (C1)
+  if (title.includes('administrativo') || cat === 'C1') {
+    return [
+      {
+        bloque: 'Bloque I: Organización del Estado y Administración Pública',
+        temas: [
+          'La Constitución de 1978: Derechos y libertades fundamentales y garantías constitucionales.',
+          'El Poder Judicial y el Tribunal Constitucional.',
+          'La Administración General del Estado y la organización territorial del Estado: Estatutos de Autonomía.',
+          'La Unión Europea: Instituciones comunitarias y ordenamiento jurídico de la UE.',
+          'Régimen Local Español: Tipología de entidades locales y competencias municipales.'
+        ]
+      },
+      {
+        bloque: 'Bloque II: Derecho Administrativo General y Procedimiento',
+        temas: [
+          'Fuentes del ordenamiento administrativo: La Ley y el Reglamento.',
+          'El Procedimiento Administrativo Común (Ley 39/2015): Estructura, plazos y recursos administrativos.',
+          'La Ley de Régimen Jurídico del Sector Público (Ley 40/2015): Funcionamiento de los órganos colegiados.',
+          'La potestad sancionadora y la responsabilidad patrimonial de la Administración Pública.',
+          'Contratos del Sector Público (Ley 9/2017): Tipos de contratos, preparación y adjudicación.'
+        ]
+      },
+      {
+        bloque: 'Bloque III: Gestión de Personal y Presupuestaria',
+        temas: [
+          'El TREBEP: Selección de personal, carrera profesional, situaciones administrativas y retribuciones.',
+          'La Seguridad Social del personal al servicio de las Administraciones Públicas.',
+          'El Presupuesto público: Concepto, principios y ciclo presupuestario.',
+          'Procedimiento de ordenación del gasto y pago: Fases de compromiso, reconocimiento y liquidación.'
+        ]
+      }
+    ];
+  }
+
+  // 3. Cuerpos Superiores y de Gestión (A1 / A2)
+  if (cat === 'A1' || cat === 'A2' || title.includes('gesti') || title.includes('técnico') || title.includes('letrado')) {
+    return [
+      {
+        bloque: 'Bloque I: Derecho Constitucional y Teoría Política',
+        temas: [
+          'La estructura constitucional española y el Estado Social y Democrático de Derecho.',
+          'El sistema electoral y los partidos políticos en el marco constitucional.',
+          'Las Comunidades Autónomas: Distribución de competencias y relaciones intergubernamentales.',
+          'El Derecho de la Unión Europea y su aplicación por los tribunales españoles.'
+        ]
+      },
+      {
+        bloque: 'Bloque II: Derecho Administrativo y Contratación Pública Avanzada',
+        temas: [
+          'La actividad convencional de la Administración: Convenios administrativos y encomiendas de gestión.',
+          'La potestad reglamentaria y su control judicial en la jurisdicción contencioso-administrativa.',
+          'Régimen exhaustivo de la Ley 9/2017 de Contratos del Sector Público: Modificados y resolución.',
+          'Régimen jurídico de subvenciones y ayudas públicas (Ley 38/2003).'
+        ]
+      },
+      {
+        bloque: 'Bloque III: Gestión Financiera, Recursos Humanos y Dirección Pública',
+        temas: [
+          'Ley General Presupuestaria y Ley Orgánica de Estabilidad Presupuestaria y Sostenibilidad Financiera.',
+          'Auditoría y control del sector público: Control interno (Intervención) y control externo (Tribunal de Cuentas).',
+          'Políticas de personal y dirección pública en las Administraciones del siglo XXI.',
+          'Gobernanza pública, transparencia, ética pública y conflicto de intereses.'
+        ]
+      }
+    ];
+  }
+
+  // 4. Sanidad / Salud (SCS, SERMAS, SAS, Celadores, Enfermería)
+  if (title.includes('salud') || title.includes('sanit') || title.includes('enferm') || title.includes('médic') || title.includes('celador') || org.includes('salud') || org.includes('scs')) {
+    return [
+      {
+        bloque: 'Bloque I: Legislación y Marco Normativo Común',
+        temas: [
+          'La Constitución Española y el derecho a la protección de la salud (Artículo 43).',
+          'Ley General de Sanidad (Ley 14/1986): Principios generales y Sistema Nacional de Salud.',
+          'Ley 16/2003 de Cohesión y Calidad del Sistema Nacional de Salud: Cartera de servicios.',
+          'Estatuto Marco del personal estatutario de los servicios de salud (Ley 55/2003).',
+          'Ley 41/2002 de Autonomía del Paciente: Consentimiento informado e historia clínica.',
+          'Estatuto de Autonomía y estructura del Servicio Autonómico de Salud correspondiente.'
+        ]
+      },
+      {
+        bloque: 'Bloque II: Materia Específica del Puesto',
+        temas: [
+          'Estructura de Atención Primaria y Asistencia Especializada.',
+          'Prevención de riesgos laborales y biológicos en el entorno sanitario.',
+          'Higiene del medio hospitalario, esterilización y gestión de residuos biosanitarios.',
+          'Bioética sanitaria, deber de confidencialidad y secreto profesional.',
+          'Protocolos de actuación en situaciones de urgencia y primeros auxilios.'
+        ]
+      }
+    ];
+  }
+
+  // 5. Policía Local y Fuerzas de Seguridad
+  if (title.includes('polic') || title.includes('seguridad') || title.includes('bombero') || title.includes('agente')) {
+    return [
+      {
+        bloque: 'Bloque I: Derecho Constitucional y Penal',
+        temas: [
+          'La Constitución Española: Derechos fundamentales y libertades públicas.',
+          'Ley Orgánica 2/1986 de Fuerzas y Cuerpos de Seguridad: Principios básicos de actuación.',
+          'El Código Penal: Delitos contra las personas, la propiedad y la seguridad vial.',
+          'El procedimiento de Habeas Corpus y la detención policial: Derechos del detenido.'
+        ]
+      },
+      {
+        bloque: 'Bloque II: Tráfico, Seguridad Vial y Régimen Local',
+        temas: [
+          'Ley sobre Tráfico, Circulación de Vehículos a Motor y Seguridad Vial.',
+          'Reglamento General de Circulación: Velocidad, prioridades y maniobras.',
+          'Protocolos ante accidentes de circulación y pruebas de alcoholemia y estupefacientes.',
+          'Ordenanzas Municipales de convivencia ciudadana y venta ambulante.',
+          'Protección civil y planes de emergencia local.'
+        ]
+      }
+    ];
+  }
+
+  // 6. Temario General Predeterminado (para oficios, subalternos o servicios)
+  return [
+    {
+      bloque: 'Bloque I: Materias Comunes de la Función Pública',
+      temas: [
+        'La Constitución Española de 1978: Valores superiores y principios informadores.',
+        'Organización del Estado y de las Administraciones Públicas.',
+        'El Estatuto Básico del Empleado Público (TREBEP): Derechos y deberes.',
+        'Políticas públicas de igualdad y no discriminación.'
+      ]
+    },
+    {
+      bloque: 'Bloque II: Materias Específicas del Puesto',
+      temas: [
+        'Funciones y tareas propias de la plaza convocada en el organismo oficial.',
+        'Seguridad y salud laboral: Prevención de riesgos en el puesto de trabajo.',
+        'Atención y trato al usuario de los servicios públicos.',
+        'Uso responsable de los recursos materiales e instalaciones públicas.'
+      ]
+    }
+  ];
+}
+

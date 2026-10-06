@@ -1,5 +1,5 @@
-// OpoFinder - Service Worker v3 (Network-First + CCAA Support)
-const CACHE_NAME = 'opofinder-cache-v3';
+// OpoFinder - Service Worker v4 (Corporate Theme, Milestones & Syllabus)
+const CACHE_NAME = 'opofinder-cache-v4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -7,7 +7,9 @@ const ASSETS_TO_CACHE = [
   './app.js',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './apple-touch-icon.png',
+  './favicon.png'
 ];
 
 self.addEventListener('install', (event) => {

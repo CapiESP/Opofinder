@@ -1,34 +1,35 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>OpoFinder - Oposiciones y Convocatorias Oficiales</title>
+  <title>OpoFinder - Portal Oficial de Convocatorias y Empleo Público</title>
   
   <!-- PWA & Apple Web App Meta -->
-  <meta name="theme-color" content="#1e3a8a">
+  <meta name="theme-color" content="#0f1e36" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#090f1a" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="OpoFinder">
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="icon" type="image/png" href="icon-192.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="favicon.png">
   
-  <!-- Estilos Mobile-First -->
-  <link rel="stylesheet" href="styles.css?v=3">
+  <!-- Estilos Corporativos (Modo Claro & Oscuro) -->
+  <link rel="stylesheet" href="styles.css?v=4">
   
   <!-- Supabase JS Client (v2) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-  <!-- ==================== 1. PANTALLA DE ACCESO / LOGIN (SUPABASE AUTH) ==================== -->
+  <!-- ==================== 1. PANTALLA DE ACCESO (SUPABASE AUTH) ==================== -->
   <div id="auth-container" class="auth-wrapper">
     <div class="auth-card">
       <div class="auth-header">
-        <div class="auth-icon">⚖️</div>
+        <img src="icon-192.png" alt="OpoFinder Logo" class="auth-logo-img">
         <h2 class="auth-title">OpoFinder</h2>
-        <p class="auth-subtitle">Acceso exclusivo a convocatorias oficiales</p>
+        <p class="auth-subtitle">Portal Oficial de Empleo Público y Convocatorias</p>
       </div>
 
       <!-- Selector de pestañas Login / Registro -->
@@ -46,42 +47,47 @@
 
       <!-- Formulario de Autenticación -->
       <form id="auth-form" onsubmit="handleAuthSubmit(event)">
-        <div class="form-group">
+        <div class="form-group" style="margin-bottom: 14px;">
           <label for="auth-email">Correo Electrónico</label>
-          <input type="email" id="auth-email" class="form-control" placeholder="tu@email.com" required autocomplete="email">
+          <input type="email" id="auth-email" class="form-control" placeholder="opositor@correo.com" required autocomplete="email">
         </div>
 
-        <div class="form-group">
+        <div class="form-group" style="margin-bottom: 18px;">
           <label for="auth-password">Contraseña</label>
           <input type="password" id="auth-password" class="form-control" placeholder="••••••••" required minlength="6" autocomplete="current-password">
         </div>
 
         <button type="submit" id="auth-submit-btn" class="btn btn-primary btn-block">
-          Entrar a OpoFinder
+          Acceder a OpoFinder
         </button>
       </form>
 
       <div style="text-align: center; margin-top: 18px; font-size: 12px; color: var(--text-muted);">
-        🔒 Tus oposiciones y filtros se sincronizan en la nube
+        🔒 Acceso protegido y sincronización multidispositivo
       </div>
     </div>
   </div>
 
-  <!-- ==================== 2. CONTENIDO PRINCIPAL DE LA APLICACIÓN (SOLO USUARIOS AUTENTICADOS) ==================== -->
+  <!-- ==================== 2. APLICACIÓN PRINCIPAL (USUARIO AUTENTICADO) ==================== -->
   <div id="app-content" style="display: none;">
     
-    <!-- Barra Superior / Header -->
+    <!-- Barra Superior / Header Institucional -->
     <header class="app-header">
       <div class="header-content">
         <div class="logo-area">
-          <div class="logo-icon">⚖️</div>
+          <img src="icon-192.png" alt="OpoFinder" class="header-logo-img">
           <div class="logo-text">
             <h1>OpoFinder</h1>
-            <p>Convocatorias Oficiales del Estado</p>
+            <p>Convocatorias Oficiales del Estado & CCAA</p>
           </div>
         </div>
         
-        <div class="header-user">
+        <div class="header-right">
+          <!-- Botón de Conmutador de Tema Claro / Oscuro -->
+          <button id="theme-toggle" class="theme-toggle-btn" title="Alternar Modo Claro / Oscuro" onclick="toggleTheme()">
+            🌙
+          </button>
+          
           <span class="user-pill" id="user-display-email">usuario@...</span>
           <button class="btn-logout" onclick="handleLogout()" title="Cerrar Sesión">Salir</button>
         </div>
@@ -94,17 +100,17 @@
       <!-- Banner Informativo para iOS Safari -->
       <div class="ios-banner" id="ios-banner">
         <div class="ios-banner-text">
-          📲 <strong>¿Usas iPhone?</strong> Pulsa <strong>Compartir</strong> y luego <strong>"Añadir a pantalla de inicio"</strong> para instalar OpoFinder y recibir alertas.
+          📲 <strong>Instalación en iPhone:</strong> Pulsa <strong>Compartir</strong> y selecciona <strong>"Añadir a pantalla de inicio"</strong> para tener OpoFinder como app con acceso directo oficial.
         </div>
-        <button class="ios-banner-btn" id="close-ios-banner">Entendido</button>
+        <button class="ios-banner-btn" id="close-ios-banner">Cerrar</button>
       </div>
 
       <!-- Banner de Alerta de Convocatorias Coincidentes -->
-      <div class="ios-banner" id="alert-banner" style="display: none; background: #fef3c7; border-color: #fde68a;">
-        <div class="ios-banner-text" style="color: #92400e;">
-          🔔 <strong id="alert-banner-text">Tienes convocatorias coincidentes.</strong>
+      <div class="ios-banner" id="alert-banner" style="display: none; border-left-color: var(--gold);">
+        <div class="ios-banner-text">
+          🔔 <strong id="alert-banner-text">Tienes nuevas convocatorias coincidentes.</strong>
         </div>
-        <button class="ios-banner-btn" style="background: #d97706;" onclick="switchTab('filtros')">Ver Alertas</button>
+        <button class="ios-banner-btn" onclick="switchTab('filtros')">Ver Alertas</button>
       </div>
 
       <!-- ==================== PESTAÑA 1: BUSCADOR ==================== -->
@@ -157,6 +163,16 @@
               </select>
             </div>
 
+            <!-- Filtro por Tipo de Proceso (Convocatoria vs Oferta OEP) -->
+            <div class="form-group">
+              <label for="filter-type">Tipo de Proceso</label>
+              <select id="filter-type" class="form-control">
+                <option value="TODOS">Todos (Convocatorias + Ofertas OEP)</option>
+                <option value="Convocatoria">Solo Convocatorias (Plazo Abierto)</option>
+                <option value="Oferta OEP">Solo Ofertas (OEP Pendientes)</option>
+              </select>
+            </div>
+
             <!-- Rango de Días del BOE -->
             <div class="form-group">
               <label for="filter-days">Publicadas en el BOE</label>
@@ -175,22 +191,12 @@
               <input type="text" id="filter-search" class="form-control" placeholder="Ej: Auxiliar, Informática, Policía...">
             </div>
 
-            <!-- Tipo de Proceso (Convocatorias vs OEPs) -->
-            <div class="form-group">
-              <label for="filter-type">Tipo de Proceso</label>
-              <select id="filter-type" class="form-control">
-                <option value="TODOS">Todos (Convocatorias + Ofertas OEP)</option>
-                <option value="Convocatoria">Solo Convocatorias (Plazo abierto)</option>
-                <option value="Oferta OEP">Solo Ofertas (OEP pendientes)</option>
-              </select>
-            </div>
-
           </div>
 
           <!-- Checkbox para Omitir Caducadas -->
           <label class="checkbox-row">
             <input type="checkbox" id="filter-hide-expired" checked>
-            <span><strong>Omitir oposiciones fuera de plazo</strong> (muestra solo plazos abiertos)</span>
+            <span><strong>Omitir convocatorias con plazo cerrado</strong> (muestra solo procesos vigentes)</span>
           </label>
 
           <!-- Acciones del Panel -->
@@ -199,7 +205,7 @@
               ⭐ Guardar Filtro de Alerta
             </button>
             <button id="btn-refresh-boe" class="btn btn-primary btn-sm">
-              🔄 Actualizar Convocatorias
+              🔄 Actualizar Listado
             </button>
           </div>
         </div>
@@ -214,7 +220,7 @@
         <div id="results-container">
           <div class="loading-container">
             <div class="spinner"></div>
-            <p>Conectando con el Boletín Oficial del Estado...</p>
+            <p>Conectando con fuentes oficiales...</p>
           </div>
         </div>
 
@@ -223,8 +229,8 @@
       <!-- ==================== PESTAÑA 2: GUARDADAS ==================== -->
       <section id="tab-guardadas" class="tab-section" style="display: none;">
         <div class="results-header">
-          <h2 style="font-size: 18px; font-weight: 700;">⭐ Mis Oposiciones Guardadas</h2>
-          <span class="results-count">Sincronizadas con tu cuenta en Supabase</span>
+          <h2 style="font-size: 18px; font-weight: 700;">⭐ Mis Oposiciones en Seguimiento</h2>
+          <span class="results-count">Pulsa en cualquier tarjeta para ver su temario y activar avisos de examen</span>
         </div>
         <div id="saved-container"></div>
       </section>
@@ -232,9 +238,9 @@
       <!-- ==================== PESTAÑA 3: FILTROS & ALERTAS ==================== -->
       <section id="tab-filtros" class="tab-section" style="display: none;">
         <div class="filter-panel">
-          <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 6px;">🔔 Mis Filtros y Alertas</h2>
+          <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 6px;">🔔 Mis Filtros y Alertas Activas</h2>
           <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-            Cuando el BOE publica una convocatoria que coincide con estos filtros, recibirás un aviso en la app y en tu móvil.
+            El sistema rastrea los boletines oficiales y te avisará cuando se publiquen nuevas convocatorias que encajen con tus criterios.
           </p>
           
           <div style="margin-bottom: 16px;">
@@ -250,30 +256,28 @@
       <!-- ==================== PESTAÑA 4: GUÍA Y AYUDA ==================== -->
       <section id="tab-ayuda" class="tab-section" style="display: none;">
         <div class="filter-panel">
-          <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">ℹ️ Guía Rápida para el Opositor</h2>
+          <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">ℹ️ Guía Oficial para el Opositor</h2>
           
           <div style="font-size: 14px; line-height: 1.6; color: var(--text-main); display: flex; flex-direction: column; gap: 14px;">
             <div>
-              <strong>1. ¿Cómo instalar OpoFinder como app en iPhone?</strong>
+              <strong>1. Ciclo de Vida y Notificaciones de Examen:</strong>
               <p style="color: var(--text-muted); font-size: 13px;">
-                Abre esta página en Safari, pulsa el botón central de <em>Compartir</em> (cuadrado con flecha hacia arriba) y selecciona <em>"Añadir a la pantalla de inicio"</em>.
+                Al abrir la ficha de una oposición, puedes activar la campana de <em>"Notificarme cambios"</em>. Te avisará automáticamente si se publica la lista de admitidos, la subsanación o la fecha y aula de examen.
               </p>
             </div>
 
             <div>
-              <strong>2. ¿De dónde provienen los datos?</strong>
+              <strong>2. Temarios Oficiales:</strong>
               <p style="color: var(--text-muted); font-size: 13px;">
-                Directamente de la API de datos abiertos del Boletín Oficial del Estado (BOE), Sección 2B.
+                Cada ficha incluye el desglose de temas del programa oficial (Parte General y Parte Específica) y un sistema para marcar los temas estudiados o repasados.
               </p>
             </div>
 
             <div>
-              <strong>3. Semáforo de Plazos de Solicitud:</strong>
-              <ul style="margin-left: 20px; font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-                <li>🟢 <strong>Verde:</strong> Más de 5 días hábiles restantes.</li>
-                <li>🟡 <strong>Amarillo:</strong> Últimos 5 días hábiles.</li>
-                <li>🔴 <strong>Rojo:</strong> Último día de plazo.</li>
-              </ul>
+              <strong>3. Instalación en iPhone / Safari:</strong>
+              <p style="color: var(--text-muted); font-size: 13px;">
+                Pulsa el icono de <em>Compartir</em> en Safari y elige <em>"Añadir a la pantalla de inicio"</em>. El icono corporativo oficial se guardará en tu móvil.
+              </p>
             </div>
           </div>
         </div>
@@ -303,9 +307,43 @@
       </button>
     </nav>
 
+    <!-- ==================== 3. MODAL DE DETALLE, HITOS & TEMARIO ==================== -->
+    <div id="detail-modal" class="modal-overlay" onclick="handleModalOverlayClick(event)">
+      <div class="detail-modal-card" onclick="event.stopPropagation()">
+        
+        <!-- Cabecera del Modal -->
+        <div class="modal-header">
+          <div class="modal-header-info">
+            <h3 id="modal-opo-title">Detalle de la Convocatoria</h3>
+            <p id="modal-opo-organismo">Organismo oficial</p>
+          </div>
+          <button class="modal-close-btn" onclick="closeDetailModal()" title="Cerrar">&times;</button>
+        </div>
+
+        <!-- Pestañas del Modal -->
+        <div class="modal-nav-tabs">
+          <button class="modal-tab-btn active" data-modaltab="hitos" onclick="switchModalTab('hitos')">
+            📋 Estado y Examen
+          </button>
+          <button class="modal-tab-btn" data-modaltab="temario" onclick="switchModalTab('temario')">
+            📚 Temario Oficial
+          </button>
+          <button class="modal-tab-btn" data-modaltab="notas" onclick="switchModalTab('notas')">
+            📝 Mis Notas
+          </button>
+        </div>
+
+        <!-- Cuerpo del Modal -->
+        <div class="modal-body" id="modal-opo-body">
+          <!-- Contenido renderizado dinámicamente por app.js -->
+        </div>
+
+      </div>
+    </div>
+
   </div>
 
   <!-- Script Principal -->
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
