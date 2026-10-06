@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="icon" type="image/png" href="icon-192.png">
   
-  <!-- Estilos -->
+  <!-- Estilos Mobile-First -->
   <link rel="stylesheet" href="styles.css">
   
   <!-- Supabase JS Client (v2) -->
@@ -22,236 +22,278 @@
 </head>
 <body>
 
-  <!-- Barra Superior / Header -->
-  <header class="app-header">
-    <div class="header-content">
-      <div class="logo-area">
-        <div class="logo-icon">⚖️</div>
-        <div class="logo-text">
-          <h1>OpoFinder</h1>
-          <p>Convocatorias Oficiales del Estado & CCAA</p>
+  <!-- ==================== 1. PANTALLA DE ACCESO / LOGIN (SUPABASE AUTH) ==================== -->
+  <div id="auth-container" class="auth-wrapper">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-icon">⚖️</div>
+        <h2 class="auth-title">OpoFinder</h2>
+        <p class="auth-subtitle">Acceso exclusivo a convocatorias oficiales</p>
+      </div>
+
+      <!-- Selector de pestañas Login / Registro -->
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab-btn active" id="tab-btn-login" onclick="switchAuthMode('login')">
+          Iniciar Sesión
+        </button>
+        <button type="button" class="auth-tab-btn" id="tab-btn-register" onclick="switchAuthMode('register')">
+          Crear Cuenta
+        </button>
+      </div>
+
+      <!-- Mensaje de Alerta / Error -->
+      <div id="auth-alert" class="auth-alert"></div>
+
+      <!-- Formulario de Autenticación -->
+      <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+        <div class="form-group">
+          <label for="auth-email">Correo Electrónico</label>
+          <input type="email" id="auth-email" class="form-control" placeholder="tu@email.com" required autocomplete="email">
+        </div>
+
+        <div class="form-group">
+          <label for="auth-password">Contraseña</label>
+          <input type="password" id="auth-password" class="form-control" placeholder="••••••••" required minlength="6" autocomplete="current-password">
+        </div>
+
+        <button type="submit" id="auth-submit-btn" class="btn btn-primary btn-block">
+          Entrar a OpoFinder
+        </button>
+      </form>
+
+      <div style="text-align: center; margin-top: 18px; font-size: 12px; color: var(--text-muted);">
+        🔒 Tus oposiciones y filtros se sincronizan en la nube
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 2. CONTENIDO PRINCIPAL DE LA APLICACIÓN (SOLO USUARIOS AUTENTICADOS) ==================== -->
+  <div id="app-content" style="display: none;">
+    
+    <!-- Barra Superior / Header -->
+    <header class="app-header">
+      <div class="header-content">
+        <div class="logo-area">
+          <div class="logo-icon">⚖️</div>
+          <div class="logo-text">
+            <h1>OpoFinder</h1>
+            <p>Convocatorias Oficiales del Estado</p>
+          </div>
+        </div>
+        
+        <div class="header-user">
+          <span class="user-pill" id="user-display-email">usuario@...</span>
+          <button class="btn-logout" onclick="handleLogout()" title="Cerrar Sesión">Salir</button>
         </div>
       </div>
-      <div class="header-actions">
-        <div class="badge-status">
-          <span class="dot-live"></span>
-          <span>BOE en directo</span>
+    </header>
+
+    <!-- Contenedor Principal -->
+    <main class="main-container">
+
+      <!-- Banner Informativo para iOS Safari -->
+      <div class="ios-banner" id="ios-banner">
+        <div class="ios-banner-text">
+          📲 <strong>¿Usas iPhone?</strong> Pulsa <strong>Compartir</strong> y luego <strong>"Añadir a pantalla de inicio"</strong> para instalar OpoFinder y recibir alertas.
         </div>
+        <button class="ios-banner-btn" id="close-ios-banner">Entendido</button>
       </div>
-    </div>
-  </header>
 
-  <!-- Contenedor Principal -->
-  <main class="main-container">
-
-    <!-- Banner Informativo para iOS Safari -->
-    <div class="ios-banner" id="ios-banner">
-      <div class="ios-banner-text">
-        📲 <strong>¿Usas iPhone?</strong> Pulsa <strong>Compartir</strong> y luego <strong>"Añadir a pantalla de inicio"</strong> para instalar OpoFinder y recibir alertas de nuevas oposiciones.
+      <!-- Banner de Alerta de Convocatorias Coincidentes -->
+      <div class="ios-banner" id="alert-banner" style="display: none; background: #fef3c7; border-color: #fde68a;">
+        <div class="ios-banner-text" style="color: #92400e;">
+          🔔 <strong id="alert-banner-text">Tienes convocatorias coincidentes.</strong>
+        </div>
+        <button class="ios-banner-btn" style="background: #d97706;" onclick="switchTab('filtros')">Ver Alertas</button>
       </div>
-      <button class="ios-banner-btn" id="close-ios-banner">Entendido</button>
-    </div>
 
-    <!-- Banner de Alerta cuando hay coincidencias con filtros guardados -->
-    <div class="ios-banner" id="alert-banner" style="display: none; background: #fef3c7; border-color: #fde68a;">
-      <div class="ios-banner-text" style="color: #92400e;">
-        🔔 <strong id="alert-banner-text">Tienes nuevas convocatorias coincidentes.</strong>
-      </div>
-      <button class="ios-banner-btn" style="background: #d97706;" onclick="switchTab('filtros')">Ver Alertas</button>
-    </div>
+      <!-- ==================== PESTAÑA 1: BUSCADOR ==================== -->
+      <section id="tab-buscador" class="tab-section">
+        
+        <!-- Panel de Filtros -->
+        <div class="filter-panel">
+          <div class="filter-grid">
+            
+            <!-- Filtro por Categoría -->
+            <div class="form-group">
+              <label for="filter-category">Categoría / Subgrupo</label>
+              <select id="filter-category" class="form-control">
+                <option value="TODAS">Todas las categorías</option>
+                <option value="C2">C2 - Auxiliares (Graduado ESO)</option>
+                <option value="C1">C1 - Administrativos (Bachiller)</option>
+                <option value="A2">A2 - Gestión / Técnicos Medios (Grado)</option>
+                <option value="A1">A1 - Técnicos Superiores (Grado/Máster)</option>
+                <option value="B">B - Técnicos Superiores FP</option>
+                <option value="AP">Agrupaciones Profesionales (Sin título)</option>
+              </select>
+            </div>
 
-    <!-- ==================== PESTAÑA 1: BUSCADOR ==================== -->
-    <section id="tab-buscador" class="tab-section">
-      
-      <!-- Panel de Filtros -->
-      <div class="filter-panel">
-        <div class="filter-grid">
+            <!-- Filtro por Región -->
+            <div class="form-group">
+              <label for="filter-region">Región / Ámbito</label>
+              <select id="filter-region" class="form-control">
+                <option value="TODAS">Todas las regiones</option>
+                <option value="Estatal">Estatal (Ministerios y AGE)</option>
+                <option value="Andalucía">Andalucía</option>
+                <option value="Aragón">Aragón</option>
+                <option value="Asturias">Asturias</option>
+                <option value="Baleares">Baleares</option>
+                <option value="Canarias">Canarias</option>
+                <option value="Cantabria">Cantabria</option>
+                <option value="Castilla-La Mancha">Castilla-La Mancha</option>
+                <option value="Castilla y León">Castilla y León</option>
+                <option value="Cataluña">Cataluña</option>
+                <option value="Extremadura">Extremadura</option>
+                <option value="Galicia">Galicia</option>
+                <option value="Madrid">Madrid</option>
+                <option value="Murcia">Murcia</option>
+                <option value="Navarra">Navarra</option>
+                <option value="País Vasco">País Vasco</option>
+                <option value="La Rioja">La Rioja</option>
+                <option value="Ceuta y Melilla">Ceuta y Melilla</option>
+                <option value="Entidades Locales">Entidades Locales (Ayuntamientos)</option>
+                <option value="Universidades">Universidades</option>
+                <option value="Justicia">Justicia</option>
+              </select>
+            </div>
+
+            <!-- Rango de Días del BOE -->
+            <div class="form-group">
+              <label for="filter-days">Publicadas en el BOE</label>
+              <select id="filter-days" class="form-control">
+                <option value="1">Solo Hoy</option>
+                <option value="3">Últimos 3 días</option>
+                <option value="7" selected>Últimos 7 días</option>
+                <option value="15">Últimos 15 días</option>
+                <option value="30">Últimos 30 días</option>
+              </select>
+            </div>
+
+            <!-- Búsqueda por Texto -->
+            <div class="form-group">
+              <label for="filter-search">Buscar Puesto / Término</label>
+              <input type="text" id="filter-search" class="form-control" placeholder="Ej: Auxiliar, Informática, Policía...">
+            </div>
+
+          </div>
+
+          <!-- Checkbox para Omitir Caducadas -->
+          <label class="checkbox-row">
+            <input type="checkbox" id="filter-hide-expired" checked>
+            <span><strong>Omitir oposiciones fuera de plazo</strong> (muestra solo plazos abiertos)</span>
+          </label>
+
+          <!-- Acciones del Panel -->
+          <div class="filter-actions">
+            <button id="btn-save-filter" class="btn btn-outline btn-sm">
+              ⭐ Guardar Filtro de Alerta
+            </button>
+            <button id="btn-refresh-boe" class="btn btn-primary btn-sm">
+              🔄 Actualizar Convocatorias
+            </button>
+          </div>
+        </div>
+
+        <!-- Cabecera de Resultados -->
+        <div class="results-header">
+          <h2 style="font-size: 16px; font-weight: 700;">Convocatorias Oficiales</h2>
+          <span class="results-count" id="results-count">Cargando convocatorias...</span>
+        </div>
+
+        <!-- Contenedor dinámico de tarjetas -->
+        <div id="results-container">
+          <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Conectando con el Boletín Oficial del Estado...</p>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ==================== PESTAÑA 2: GUARDADAS ==================== -->
+      <section id="tab-guardadas" class="tab-section" style="display: none;">
+        <div class="results-header">
+          <h2 style="font-size: 18px; font-weight: 700;">⭐ Mis Oposiciones Guardadas</h2>
+          <span class="results-count">Sincronizadas con tu cuenta en Supabase</span>
+        </div>
+        <div id="saved-container"></div>
+      </section>
+
+      <!-- ==================== PESTAÑA 3: FILTROS & ALERTAS ==================== -->
+      <section id="tab-filtros" class="tab-section" style="display: none;">
+        <div class="filter-panel">
+          <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 6px;">🔔 Mis Filtros y Alertas</h2>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+            Cuando el BOE publica una convocatoria que coincide con estos filtros, recibirás un aviso en la app y en tu móvil.
+          </p>
           
-          <!-- Filtro por Categoría -->
-          <div class="form-group">
-            <label for="filter-category">Categoría / Subgrupo</label>
-            <select id="filter-category" class="form-control">
-              <option value="TODAS">Todas las categorías</option>
-              <option value="C2">C2 - Auxiliares (Graduado ESO)</option>
-              <option value="C1">C1 - Administrativos (Bachiller)</option>
-              <option value="A2">A2 - Gestión / Técnicos Medios (Grado)</option>
-              <option value="A1">A1 - Técnicos Superiores (Grado/Máster)</option>
-              <option value="B">B - Técnicos Superiores FP</option>
-              <option value="AP">Agrupaciones Profesionales (Sin título)</option>
-            </select>
+          <div style="margin-bottom: 16px;">
+            <button class="btn btn-primary btn-sm" onclick="requestNotificationPermission()">
+              📱 Activar Notificaciones en este Dispositivo
+            </button>
           </div>
 
-          <!-- Filtro por Región -->
-          <div class="form-group">
-            <label for="filter-region">Región / Ámbito</label>
-            <select id="filter-region" class="form-control">
-              <option value="TODAS">Todas las regiones</option>
-              <option value="Estatal">Estatal (Ministerios y AGE)</option>
-              <option value="Andalucía">Andalucía</option>
-              <option value="Aragón">Aragón</option>
-              <option value="Asturias">Asturias</option>
-              <option value="Baleares">Baleares</option>
-              <option value="Canarias">Canarias</option>
-              <option value="Cantabria">Cantabria</option>
-              <option value="Castilla-La Mancha">Castilla-La Mancha</option>
-              <option value="Castilla y León">Castilla y León</option>
-              <option value="Cataluña">Cataluña</option>
-              <option value="Extremadura">Extremadura</option>
-              <option value="Galicia">Galicia</option>
-              <option value="Madrid">Madrid</option>
-              <option value="Murcia">Murcia</option>
-              <option value="Navarra">Navarra</option>
-              <option value="País Vasco">País Vasco</option>
-              <option value="La Rioja">La Rioja</option>
-              <option value="Ceuta y Melilla">Ceuta y Melilla</option>
-              <option value="Entidades Locales">Entidades Locales (Ayuntamientos)</option>
-              <option value="Universidades">Universidades</option>
-              <option value="Justicia">Justicia</option>
-            </select>
-          </div>
-
-          <!-- Rango de Días del BOE -->
-          <div class="form-group">
-            <label for="filter-days">Publicadas en el BOE</label>
-            <select id="filter-days" class="form-control">
-              <option value="1">Solo Hoy</option>
-              <option value="3">Últimos 3 días</option>
-              <option value="7" selected>Últimos 7 días</option>
-              <option value="15">Últimos 15 días</option>
-              <option value="30">Últimos 30 días</option>
-            </select>
-          </div>
-
-          <!-- Búsqueda por Texto -->
-          <div class="form-group">
-            <label for="filter-search">Buscar Puesto / Término</label>
-            <input type="text" id="filter-search" class="form-control" placeholder="Ej: Auxiliar, Informática, Policía...">
-          </div>
-
+          <div id="filters-list"></div>
         </div>
+      </section>
 
-        <!-- Checkbox para Omitir Caducadas -->
-        <label class="checkbox-row">
-          <input type="checkbox" id="filter-hide-expired" checked>
-          <span><strong>Omitir oposiciones caducadas o fuera de plazo</strong> (muestra solo plazos abiertos)</span>
-        </label>
+      <!-- ==================== PESTAÑA 4: GUÍA Y AYUDA ==================== -->
+      <section id="tab-ayuda" class="tab-section" style="display: none;">
+        <div class="filter-panel">
+          <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">ℹ️ Guía Rápida para el Opositor</h2>
+          
+          <div style="font-size: 14px; line-height: 1.6; color: var(--text-main); display: flex; flex-direction: column; gap: 14px;">
+            <div>
+              <strong>1. ¿Cómo instalar OpoFinder como app en iPhone?</strong>
+              <p style="color: var(--text-muted); font-size: 13px;">
+                Abre esta página en Safari, pulsa el botón central de <em>Compartir</em> (cuadrado con flecha hacia arriba) y selecciona <em>"Añadir a la pantalla de inicio"</em>.
+              </p>
+            </div>
 
-        <!-- Acciones del Panel -->
-        <div class="filter-actions">
-          <button id="btn-save-filter" class="btn btn-outline btn-sm" title="Guardar esta búsqueda para recibir alertas">
-            ⭐ Guardar Filtro de Alerta
-          </button>
-          <button id="btn-refresh-boe" class="btn btn-primary btn-sm">
-            🔄 Actualizar Convocatorias
-          </button>
-        </div>
-      </div>
+            <div>
+              <strong>2. ¿De dónde provienen los datos?</strong>
+              <p style="color: var(--text-muted); font-size: 13px;">
+                Directamente de la API de datos abiertos del Boletín Oficial del Estado (BOE), Sección 2B.
+              </p>
+            </div>
 
-      <!-- Cabecera de Resultados -->
-      <div class="results-header">
-        <h2 style="font-size: 16px; font-weight: 700;">Convocatorias Oficiales</h2>
-        <span class="results-count" id="results-count">Cargando convocatorias...</span>
-      </div>
-
-      <!-- Contenedor dinámico de tarjetas -->
-      <div id="results-container">
-        <div class="loading-container">
-          <div class="spinner"></div>
-          <p>Conectando con el Boletín Oficial del Estado...</p>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ==================== PESTAÑA 2: GUARDADAS ==================== -->
-    <section id="tab-guardadas" class="tab-section" style="display: none;">
-      <div class="results-header">
-        <h2 style="font-size: 18px; font-weight: 700;">⭐ Mis Oposiciones Guardadas</h2>
-        <span class="results-count">Sincronizadas en la nube y en tu dispositivo</span>
-      </div>
-      <div id="saved-container"></div>
-    </section>
-
-    <!-- ==================== PESTAÑA 3: FILTROS & ALERTAS ==================== -->
-    <section id="tab-filtros" class="tab-section" style="display: none;">
-      <div class="filter-panel">
-        <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 6px;">🔔 Mis Filtros y Alertas Activas</h2>
-        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-          Cuando el BOE publica una nueva convocatoria que coincide con estos filtros, recibirás un aviso automático en la app y en tu móvil.
-        </p>
-        
-        <div style="margin-bottom: 16px;">
-          <button class="btn btn-primary btn-sm" onclick="requestNotificationPermission()">
-            📱 Activar Notificaciones en este Dispositivo
-          </button>
-        </div>
-
-        <div id="filters-list"></div>
-      </div>
-    </section>
-
-    <!-- ==================== PESTAÑA 4: GUÍA Y AYUDA ==================== -->
-    <section id="tab-ayuda" class="tab-section" style="display: none;">
-      <div class="filter-panel">
-        <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">ℹ️ Guía Rápida para el Opositor</h2>
-        
-        <div style="font-size: 14px; line-height: 1.6; color: var(--text-main); display: flex; flex-direction: column; gap: 14px;">
-          <div>
-            <strong>1. ¿Cómo instalar OpoFinder como app en tu iPhone?</strong>
-            <p style="color: var(--text-muted); font-size: 13px;">
-              Abre esta página en Safari, pulsa el botón central de <em>Compartir</em> (el icono del cuadrado con la flecha hacia arriba) y selecciona <em>"Añadir a la pantalla de inicio"</em>. Tendrás OpoFinder como una aplicación nativa.
-            </p>
-          </div>
-
-          <div>
-            <strong>2. ¿De dónde provienen los datos?</strong>
-            <p style="color: var(--text-muted); font-size: 13px;">
-              Todos los datos se obtienen en tiempo real directamente de la <strong>API oficial del Boletín Oficial del Estado (BOE)</strong>, Sección 2B (Oposiciones y Concursos).
-            </p>
-          </div>
-
-          <div>
-            <strong>3. Semáforo de Plazos de Instancias:</strong>
-            <ul style="margin-left: 20px; font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-              <li>🟢 <strong>Verde:</strong> Más de 5 días hábiles restantes para inscribirte.</li>
-              <li>🟡 <strong>Amarillo:</strong> Últimos 5 días hábiles (¡plazo a punto de vencer!).</li>
-              <li>🔴 <strong>Rojo:</strong> Último día de presentación de solicitudes.</li>
-            </ul>
-          </div>
-
-          <div>
-            <strong>4. Próxima actualización:</strong>
-            <p style="color: var(--text-muted); font-size: 13px;">
-              Descarga de temarios oficiales y resúmenes organizados por temas y materias.
-            </p>
+            <div>
+              <strong>3. Semáforo de Plazos de Solicitud:</strong>
+              <ul style="margin-left: 20px; font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                <li>🟢 <strong>Verde:</strong> Más de 5 días hábiles restantes.</li>
+                <li>🟡 <strong>Amarillo:</strong> Últimos 5 días hábiles.</li>
+                <li>🔴 <strong>Rojo:</strong> Último día de plazo.</li>
+              </ul>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-  </main>
+    </main>
 
-  <!-- Barra de Navegación Inferior Móvil -->
-  <nav class="bottom-nav">
-    <button class="nav-item active" data-tab="buscador">
-      <span class="icon">🔍</span>
-      <span>Buscador</span>
-    </button>
-    <button class="nav-item" data-tab="guardadas">
-      <span class="icon">⭐</span>
-      <span>Guardadas</span>
-      <span class="nav-badge" id="saved-badge" style="display: none;">0</span>
-    </button>
-    <button class="nav-item" data-tab="filtros">
-      <span class="icon">🔔</span>
-      <span>Alertas</span>
-      <span class="nav-badge" id="filters-badge" style="display: none;">0</span>
-    </button>
-    <button class="nav-item" data-tab="ayuda">
-      <span class="icon">ℹ️</span>
-      <span>Guía</span>
-    </button>
-  </nav>
+    <!-- Barra de Navegación Inferior Móvil -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-tab="buscador">
+        <span class="icon">🔍</span>
+        <span>Buscador</span>
+      </button>
+      <button class="nav-item" data-tab="guardadas">
+        <span class="icon">⭐</span>
+        <span>Guardadas</span>
+        <span class="nav-badge" id="saved-badge" style="display: none;">0</span>
+      </button>
+      <button class="nav-item" data-tab="filtros">
+        <span class="icon">🔔</span>
+        <span>Alertas</span>
+        <span class="nav-badge" id="filters-badge" style="display: none;">0</span>
+      </button>
+      <button class="nav-item" data-tab="ayuda">
+        <span class="icon">ℹ️</span>
+        <span>Guía</span>
+      </button>
+    </nav>
+
+  </div>
 
   <!-- Script Principal -->
   <script src="app.js"></script>

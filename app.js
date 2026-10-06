@@ -1,6 +1,6 @@
 /**
- * OpoFinder - Lógica Principal de la Aplicación
- * Conexión a API del BOE + Supabase + Almacenamiento Local PWA
+ * OpoFinder - Lógica Principal con Supabase Auth & Mobile-First
+ * Exclusivo para usuarios autenticados
  */
 
 // --- 1. Configuración de Supabase ---
@@ -8,24 +8,24 @@ const SUPABASE_URL = 'https://cnxlamwrkljwuifglzlp.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_qzW2YoR8jLfu_7mKb0mkFA_t9nqyom9';
 
 let supabaseClient = null;
-let useCloudStorage = false;
+let currentUser = null;
+let authMode = 'login'; // 'login' o 'register'
 
 try {
   if (window.supabase) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    useCloudStorage = true;
-    console.log('Supabase inicializado correctamente.');
+    console.log('Supabase Auth inicializado.');
   }
 } catch (err) {
-  console.warn('Modo local activado (sin conexión Supabase):', err);
+  console.error('Error al inicializar Supabase:', err);
 }
 
 // --- 2. Estado de la Aplicación ---
 const state = {
   currentTab: 'buscador', // 'buscador', 'guardadas', 'filtros', 'ayuda'
   oposiciones: [],        // Convocatorias cargadas desde el BOE
-  guardadas: [],          // Oposiciones marcadas como favoritas
-  filtrosGuardados: [],   // Filtros de alerta del usuario
+  guardadas: [],          // Oposiciones marcadas por el usuario actual
+  filtrosGuardados: [],   // Filtros de alerta del usuario actual
   loading: false,
   alertCount: 0
 };
@@ -35,16 +35,130 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupNavigation();
   setupEventListeners();
   registerServiceWorker();
-  
-  // Cargar datos guardados (desde Supabase con fallback a LocalStorage)
-  await loadSavedOposiciones();
-  await loadSavedFilters();
-  
-  // Realizar búsqueda inicial (Últimos 7 días)
-  await searchBOE();
+
+  // Escuchar cambios de sesión en Supabase
+  if (supabaseClient) {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    handleAuthState(session);
+
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
+      handleAuthState(session);
+    });
+  }
 });
 
-// --- 4. Navegación por Pestañas ---
+// --- 4. Gestión de Autenticación (Login / Registro / Logout) ---
+function switchAuthMode(mode) {
+  authMode = mode;
+  const loginTab = document.getElementById('tab-btn-login');
+  const registerTab = document.getElementById('tab-btn-register');
+  const submitBtn = document.getElementById('auth-submit-btn');
+  const alertEl = document.getElementById('auth-alert');
+  
+  alertEl.style.display = 'none';
+
+  if (mode === 'login') {
+    loginTab.classList.add('active');
+    registerTab.classList.remove('active');
+    submitBtn.textContent = 'Entrar a OpoFinder';
+  } else {
+    registerTab.classList.add('active');
+    loginTab.classList.remove('active');
+    submitBtn.textContent = 'Crear Cuenta y Entrar';
+  }
+}
+
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const submitBtn = document.getElementById('auth-submit-btn');
+  const alertEl = document.getElementById('auth-alert');
+
+  if (!email || !password) return;
+
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;border-top-color:#fff;"></span> Procesando...';
+  alertEl.style.display = 'none';
+
+  try {
+    if (authMode === 'login') {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      showToast('¡Bienvenido de nuevo!');
+    } else {
+      const { data, error } = await supabaseClient.auth.signUp({ email, password });
+      if (error) throw error;
+      
+      if (data?.session) {
+        showToast('¡Cuenta creada con éxito!');
+      } else {
+        // En caso de que el proyecto de Supabase requiera confirmación por email
+        alertEl.className = 'auth-alert success';
+        alertEl.textContent = '¡Cuenta registrada! Si tienes activada la confirmación por correo, revisa tu bandeja de entrada para verificar tu cuenta.';
+        alertEl.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Crear Cuenta y Entrar';
+        return;
+      }
+    }
+  } catch (err) {
+    console.error('Error de autenticación:', err);
+    alertEl.className = 'auth-alert error';
+    alertEl.textContent = err.message || 'Error al autenticar. Revisa tus datos e inténtalo de nuevo.';
+    alertEl.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = authMode === 'login' ? 'Entrar a OpoFinder' : 'Crear Cuenta y Entrar';
+  }
+}
+
+async function handleLogout() {
+  if (confirm('¿Deseas cerrar tu sesión?')) {
+    if (supabaseClient) {
+      await supabaseClient.auth.signOut();
+    }
+    currentUser = null;
+    state.guardadas = [];
+    state.filtrosGuardados = [];
+    showToast('Sesión cerrada');
+  }
+}
+
+function handleAuthState(session) {
+  const authContainer = document.getElementById('auth-container');
+  const appContent = document.getElementById('app-content');
+  const userEmailDisplay = document.getElementById('user-display-email');
+
+  if (session && session.user) {
+    currentUser = session.user;
+    authContainer.style.display = 'none';
+    appContent.style.display = 'block';
+    if (userEmailDisplay) {
+      userEmailDisplay.textContent = currentUser.email;
+    }
+
+    // Cargar datos propios del usuario autenticado
+    loadUserData();
+  } else {
+    currentUser = null;
+    authContainer.style.display = 'flex';
+    appContent.style.display = 'none';
+  }
+}
+
+async function loadUserData() {
+  await loadSavedOposiciones();
+  await loadSavedFilters();
+  if (state.oposiciones.length === 0) {
+    await searchBOE();
+  } else {
+    checkFilterAlerts();
+    applyFiltersAndRender();
+  }
+}
+
+// --- 5. Navegación por Pestañas ---
 function setupNavigation() {
   const navButtons = document.querySelectorAll('.nav-item');
   navButtons.forEach(btn => {
@@ -58,12 +172,10 @@ function setupNavigation() {
 function switchTab(tabName) {
   state.currentTab = tabName;
   
-  // Actualizar botones de navegación
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
   });
   
-  // Mostrar sección correspondiente
   document.querySelectorAll('.tab-section').forEach(sec => {
     sec.style.display = 'none';
   });
@@ -73,7 +185,6 @@ function switchTab(tabName) {
     activeSection.style.display = 'block';
   }
   
-  // Acciones al cambiar de pestaña
   if (tabName === 'guardadas') {
     renderGuardadas();
   } else if (tabName === 'filtros') {
@@ -83,10 +194,9 @@ function switchTab(tabName) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// --- 5. Consulta a la API Oficial del BOE ---
+// --- 6. Consulta a la API Oficial del BOE ---
 async function searchBOE() {
   const container = document.getElementById('results-container');
-  const countEl = document.getElementById('results-count');
   
   state.loading = true;
   container.innerHTML = `
@@ -116,8 +226,7 @@ async function searchBOE() {
         const secciones = d?.seccion || [];
         for (const sec of (Array.isArray(secciones) ? secciones : [secciones])) {
           const secCode = sec?.['@codigo'] || sec?.codigo;
-          // Sección 2B = Oposiciones y concursos
-          if (secCode === '2B') {
+          if (secCode === '2B') { // Sección 2B: Oposiciones y concursos
             const deps = sec?.departamento || [];
             for (const dep of (Array.isArray(deps) ? deps : [deps])) {
               const depName = dep?.['@nombre'] || dep?.nombre || 'Administración Pública';
@@ -143,20 +252,16 @@ async function searchBOE() {
   state.oposiciones = allOpos;
   state.loading = false;
   
-  // Comprobar alertas de filtros guardados
   checkFilterAlerts();
-  
-  // Aplicar filtros locales y renderizar
   applyFiltersAndRender();
 }
 
-// --- 6. Procesamiento y Clasificación de Convocatorias ---
+// --- 7. Procesamiento y Clasificación de Convocatorias ---
 function processBoeItem(item, depName, dateStr) {
   const titulo = item?.titulo || '';
   const id = item?.identificador || '';
   if (!id || !titulo) return null;
   
-  // Extraer enlace del PDF
   let urlPdf = '';
   if (typeof item?.url_pdf === 'object') {
     urlPdf = item?.url_pdf?.texto || '';
@@ -170,16 +275,9 @@ function processBoeItem(item, depName, dateStr) {
     urlPdf = `https://www.boe.es/boe/dias/${y}/${m}/${d}/pdfs/${id}.pdf`;
   }
   
-  // Extraer enlace oficial web
   const urlOficial = item?.url_html || `https://www.boe.es/diario_boe/txt.php?id=${id}`;
-  
-  // 1. Detección Inteligente de Categoría (Subgrupo)
   const categoria = detectCategory(titulo, depName);
-  
-  // 2. Detección de Región / Ámbito
   const region = detectRegion(depName, titulo);
-  
-  // 3. Cálculo de Plazo (20 días hábiles)
   const deadlineInfo = calculateDeadline(dateStr);
   
   return {
@@ -198,10 +296,8 @@ function processBoeItem(item, depName, dateStr) {
   };
 }
 
-// Clasificador de Categorías (A1, A2, B, C1, C2, AP)
 function detectCategory(titulo, depName) {
   const text = `${titulo} ${depName}`.toUpperCase();
-  
   if (/\b(SUBGRUPO\s+A1|GRUPO\s+A1|A1)\b/.test(text) || text.includes('SUPERIOR') || text.includes('LETRADO') || text.includes('JUEZ') || text.includes('FISCAL')) {
     return 'A1';
   }
@@ -220,14 +316,11 @@ function detectCategory(titulo, depName) {
   if (text.includes('AGRUPACIÓN PROFESIONAL') || text.includes('OPERARIO') || text.includes('SUBALTERNO') || text.includes('ORDENANZA')) {
     return 'AP';
   }
-  
   return 'OTRA';
 }
 
-// Clasificador de Región / Ámbito
 function detectRegion(depName, titulo) {
   const text = `${depName} ${titulo}`.toUpperCase();
-  
   const regionsMap = {
     'ANDALUCIA': 'Andalucía',
     'ARAGON': 'Aragón',
@@ -255,31 +348,27 @@ function detectRegion(depName, titulo) {
   };
   
   for (const [key, val] of Object.entries(regionsMap)) {
-    if (text.includes(key)) {
-      return val;
-    }
+    if (text.includes(key)) return val;
   }
   
   if (text.includes('MINISTERIO') || text.includes('ESTATAL') || text.includes('AGENCIA ESTATAL') || text.includes('CONSEJO')) {
     return 'Estatal';
   }
-  
   return 'Otras';
 }
 
-// Cálculo de 20 días hábiles (excluyendo sábados y domingos)
 function calculateDeadline(dateStr) {
   const y = parseInt(dateStr.substring(0, 4));
   const m = parseInt(dateStr.substring(4, 6)) - 1;
   const d = parseInt(dateStr.substring(6, 8));
   
   let current = new Date(y, m, d);
-  current.setDate(current.getDate() + 1); // El plazo cuenta desde el día siguiente
+  current.setDate(current.getDate() + 1);
   
   let businessDays = 0;
   while (businessDays < 20) {
     const dayOfWeek = current.getDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Omitir fin de semana
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
       businessDays++;
     }
     if (businessDays < 20) {
@@ -295,19 +384,15 @@ function calculateDeadline(dateStr) {
   const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
   let status = 'abierto';
-  if (daysLeft < 0) {
-    status = 'caducada';
-  } else if (daysLeft <= 3) {
-    status = 'urgente';
-  } else if (daysLeft <= 7) {
-    status = 'medio';
-  }
+  if (daysLeft < 0) status = 'caducada';
+  else if (daysLeft <= 3) status = 'urgente';
+  else if (daysLeft <= 7) status = 'medio';
   
   const formattedDate = `${String(current.getDate()).padStart(2, '0')}/${String(current.getMonth() + 1).padStart(2, '0')}/${current.getFullYear()}`;
   return { formattedDate, daysLeft, status };
 }
 
-// --- 7. Filtrado Local y Renderizado ---
+// --- 8. Filtrado y Renderizado ---
 function applyFiltersAndRender() {
   const selectedCat = document.getElementById('filter-category').value;
   const selectedRegion = document.getElementById('filter-region').value;
@@ -315,25 +400,13 @@ function applyFiltersAndRender() {
   const hideExpired = document.getElementById('filter-hide-expired').checked;
   
   let filtered = state.oposiciones.filter(item => {
-    // 1. Filtro por Categoría
-    if (selectedCat !== 'TODAS' && item.categoria !== selectedCat) {
-      return false;
-    }
-    // 2. Filtro por Región
-    if (selectedRegion !== 'TODAS' && item.region !== selectedRegion) {
-      return false;
-    }
-    // 3. Filtro por Palabra Clave
+    if (selectedCat !== 'TODAS' && item.categoria !== selectedCat) return false;
+    if (selectedRegion !== 'TODAS' && item.region !== selectedRegion) return false;
     if (searchKeyword) {
       const matchText = `${item.titulo} ${item.organismo}`.toLowerCase();
-      if (!matchText.includes(searchKeyword)) {
-        return false;
-      }
+      if (!matchText.includes(searchKeyword)) return false;
     }
-    // 4. Omitir caducadas
-    if (hideExpired && item.diasRestantes < 0) {
-      return false;
-    }
+    if (hideExpired && item.diasRestantes < 0) return false;
     return true;
   });
   
@@ -365,7 +438,6 @@ function renderCards(list, containerEl) {
 function createCardHTML(item) {
   const isSaved = state.guardadas.some(g => g.id === item.id);
   
-  // Semáforo de plazo
   let trafficHtml = '';
   if (item.diasRestantes < 0) {
     trafficHtml = `<span class="traffic-light traffic-red">🔴 Plazo finalizado</span>`;
@@ -384,7 +456,7 @@ function createCardHTML(item) {
           <span class="badge badge-${item.categoria.toLowerCase()}">${item.categoria}</span>
           <span class="badge badge-region">${item.region}</span>
         </div>
-        <button class="btn-bookmark ${isSaved ? 'active' : ''}" onclick="toggleBookmark('${item.id}')" title="${isSaved ? 'Desmarcar y borrar de local' : 'Guardar oposición'}">
+        <button class="btn-bookmark ${isSaved ? 'active' : ''}" onclick="toggleBookmark('${item.id}')" title="${isSaved ? 'Desmarcar y borrar de tu cuenta' : 'Guardar oposición'}">
           ${isSaved ? '★' : '☆'}
         </button>
       </div>
@@ -423,8 +495,13 @@ function createCardHTML(item) {
   `;
 }
 
-// --- 8. Gestión de Oposiciones Guardadas (Favoritos) ---
+// --- 9. Oposiciones Guardadas en Supabase (Multi-Usuario) ---
 async function toggleBookmark(id) {
+  if (!currentUser) {
+    showToast('Inicia sesión para guardar oposiciones');
+    return;
+  }
+
   const item = state.oposiciones.find(o => o.id === id) || state.guardadas.find(g => g.id === id);
   if (!item) return;
   
@@ -432,27 +509,23 @@ async function toggleBookmark(id) {
   const isCurrentlySaved = index !== -1;
   
   if (isCurrentlySaved) {
-    // Desmarcar y borrar
     state.guardadas.splice(index, 1);
     await deleteSavedOposicionFromStorage(id);
-    showToast('Oposición desmarcada y eliminada de local');
+    showToast('Oposición desmarcada');
   } else {
-    // Guardar
     state.guardadas.push(item);
     await saveOposicionToStorage(item);
-    showToast('Oposición guardada con éxito');
+    showToast('Oposición guardada en tu cuenta');
   }
   
   updateSavedBadge();
   
-  // Actualizar tarjeta en pantalla si existe
   const card = document.getElementById(`card-${id}`);
   if (card) {
     const btn = card.querySelector('.btn-bookmark');
     if (btn) {
       btn.classList.toggle('active', !isCurrentlySaved);
       btn.innerHTML = !isCurrentlySaved ? '★' : '☆';
-      btn.title = !isCurrentlySaved ? 'Desmarcar y borrar de local' : 'Guardar oposición';
     }
     card.classList.toggle('saved-highlight', !isCurrentlySaved);
   }
@@ -470,7 +543,7 @@ function renderGuardadas() {
         <div class="empty-icon">⭐</div>
         <h3>No tienes oposiciones guardadas</h3>
         <p style="color: var(--text-muted); font-size: 14px; margin-top: 6px;">
-          En el buscador, pulsa la estrella (☆) en las convocatorias que te interesen para guardarlas aquí y consultar sus PDFs oficiales.
+          Pulsa la estrella (☆) en las convocatorias del buscador para guardarlas y descargarlas cuando quieras.
         </p>
       </div>
     `;
@@ -479,14 +552,15 @@ function renderGuardadas() {
   renderCards(state.guardadas, container);
 }
 
-// Persistencia en Supabase + LocalStorage
 async function saveOposicionToStorage(item) {
-  localStorage.setItem('opofinder_saved', JSON.stringify(state.guardadas));
+  // Caché local para velocidad
+  localStorage.setItem(`opofinder_saved_${currentUser.id}`, JSON.stringify(state.guardadas));
   
-  if (useCloudStorage && supabaseClient) {
+  if (supabaseClient && currentUser) {
     try {
       await supabaseClient.from('oposiciones_guardadas').upsert({
         id: item.id,
+        user_id: currentUser.id,
         titulo: item.titulo,
         organismo: item.organismo,
         categoria: item.categoria,
@@ -497,17 +571,20 @@ async function saveOposicionToStorage(item) {
         url_oficial: item.urlOficial
       });
     } catch (err) {
-      console.warn('Error al guardar en Supabase (usando local):', err);
+      console.warn('Error al guardar en Supabase:', err);
     }
   }
 }
 
 async function deleteSavedOposicionFromStorage(id) {
-  localStorage.setItem('opofinder_saved', JSON.stringify(state.guardadas));
+  localStorage.setItem(`opofinder_saved_${currentUser.id}`, JSON.stringify(state.guardadas));
   
-  if (useCloudStorage && supabaseClient) {
+  if (supabaseClient && currentUser) {
     try {
-      await supabaseClient.from('oposiciones_guardadas').delete().eq('id', id);
+      await supabaseClient.from('oposiciones_guardadas')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', currentUser.id);
     } catch (err) {
       console.warn('Error al borrar en Supabase:', err);
     }
@@ -515,18 +592,21 @@ async function deleteSavedOposicionFromStorage(id) {
 }
 
 async function loadSavedOposiciones() {
-  // Primero leer de LocalStorage
-  const local = localStorage.getItem('opofinder_saved');
+  if (!currentUser) return;
+
+  const local = localStorage.getItem(`opofinder_saved_${currentUser.id}`);
   if (local) {
     try { state.guardadas = JSON.parse(local); } catch(e){}
   }
   
-  // Sincronizar con Supabase si está disponible
-  if (useCloudStorage && supabaseClient) {
+  if (supabaseClient && currentUser) {
     try {
-      const { data, error } = await supabaseClient.from('oposiciones_guardadas').select('*');
-      if (!error && data && data.length > 0) {
-        // Mapear campos de la base de datos a formato de la app
+      const { data, error } = await supabaseClient
+        .from('oposiciones_guardadas')
+        .select('*')
+        .eq('user_id', currentUser.id);
+
+      if (!error && data) {
         state.guardadas = data.map(d => ({
           id: d.id,
           titulo: d.titulo,
@@ -540,10 +620,10 @@ async function loadSavedOposiciones() {
           urlPdf: d.url_pdf,
           urlOficial: d.url_oficial
         }));
-        localStorage.setItem('opofinder_saved', JSON.stringify(state.guardadas));
+        localStorage.setItem(`opofinder_saved_${currentUser.id}`, JSON.stringify(state.guardadas));
       }
     } catch (err) {
-      console.log('Modo sin conexión remota, datos locales cargados.');
+      console.log('Error o sin conexión remota al cargar guardadas.');
     }
   }
   updateSavedBadge();
@@ -558,13 +638,15 @@ function updateSavedBadge() {
   }
 }
 
-// --- 9. Filtros Guardados y Alertas de Nuevas Convocatorias ---
+// --- 10. Filtros Guardados en Supabase ---
 async function saveCurrentFilter() {
+  if (!currentUser) return;
+
   const cat = document.getElementById('filter-category').value;
   const region = document.getElementById('filter-region').value;
   const kw = document.getElementById('filter-search').value.trim();
   
-  const name = prompt('Nombre para este filtro de alerta (ej: "Auxiliares Madrid", "C1 Estatal"):', `${cat !== 'TODAS' ? cat : 'Todas'} - ${region !== 'TODAS' ? region : 'Cualquier Región'}`);
+  const name = prompt('Nombre para este filtro de alerta:', `${cat !== 'TODAS' ? cat : 'Todas'} - ${region !== 'TODAS' ? region : 'Cualquier Región'}`);
   if (!name) return;
   
   const newFilter = {
@@ -577,11 +659,12 @@ async function saveCurrentFilter() {
   };
   
   state.filtrosGuardados.push(newFilter);
-  localStorage.setItem('opofinder_filters', JSON.stringify(state.filtrosGuardados));
+  localStorage.setItem(`opofinder_filters_${currentUser.id}`, JSON.stringify(state.filtrosGuardados));
   
-  if (useCloudStorage && supabaseClient) {
+  if (supabaseClient && currentUser) {
     try {
       await supabaseClient.from('filtros').insert({
+        user_id: currentUser.id,
         nombre: newFilter.nombre,
         categoria: newFilter.categoria,
         region: newFilter.region,
@@ -591,22 +674,28 @@ async function saveCurrentFilter() {
     } catch(e){}
   }
   
-  showToast('Filtro de alerta guardado con éxito');
+  showToast('Filtro de alerta guardado');
   checkFilterAlerts();
 }
 
 async function loadSavedFilters() {
-  const local = localStorage.getItem('opofinder_filters');
+  if (!currentUser) return;
+
+  const local = localStorage.getItem(`opofinder_filters_${currentUser.id}`);
   if (local) {
     try { state.filtrosGuardados = JSON.parse(local); } catch(e){}
   }
   
-  if (useCloudStorage && supabaseClient) {
+  if (supabaseClient && currentUser) {
     try {
-      const { data, error } = await supabaseClient.from('filtros').select('*');
-      if (!error && data && data.length > 0) {
+      const { data, error } = await supabaseClient
+        .from('filtros')
+        .select('*')
+        .eq('user_id', currentUser.id);
+
+      if (!error && data) {
         state.filtrosGuardados = data;
-        localStorage.setItem('opofinder_filters', JSON.stringify(state.filtrosGuardados));
+        localStorage.setItem(`opofinder_filters_${currentUser.id}`, JSON.stringify(state.filtrosGuardados));
       }
     } catch(e){}
   }
@@ -650,7 +739,7 @@ function renderFiltrosList() {
         <div class="empty-icon">🔔</div>
         <h3>No tienes filtros de alerta guardados</h3>
         <p style="color: var(--text-muted); font-size: 14px; margin-top: 6px;">
-          En el buscador, selecciona tu categoría y región preferida y pulsa "Guardar Filtro de Alerta" para recibir avisos cuando salgan nuevas convocatorias.
+          En el buscador, selecciona tu categoría y región y pulsa "Guardar Filtro de Alerta" para recibir avisos de nuevas publicaciones.
         </p>
       </div>
     `;
@@ -658,7 +747,7 @@ function renderFiltrosList() {
   }
   
   listEl.innerHTML = state.filtrosGuardados.map(f => `
-    <div class="opo-card" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+    <div class="opo-card" style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;">
       <div>
         <h4 style="font-size: 15px; font-weight: 700;">${escapeHTML(f.nombre)}</h4>
         <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
@@ -666,7 +755,7 @@ function renderFiltrosList() {
           ${f.palabra_clave ? `| Término: <strong>${escapeHTML(f.palabra_clave)}</strong>` : ''}
         </div>
       </div>
-      <div style="display: flex; gap: 8px;">
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
         <button class="btn btn-outline btn-sm" onclick="applyQuickFilter('${f.categoria}', '${f.region}', '${escapeHTML(f.palabra_clave || '')}')">
           Aplicar
         </button>
@@ -687,11 +776,17 @@ function applyQuickFilter(cat, region, kw) {
 }
 
 async function deleteFilter(id) {
+  if (!currentUser) return;
   state.filtrosGuardados = state.filtrosGuardados.filter(f => f.id !== id);
-  localStorage.setItem('opofinder_filters', JSON.stringify(state.filtrosGuardados));
+  localStorage.setItem(`opofinder_filters_${currentUser.id}`, JSON.stringify(state.filtrosGuardados));
   
-  if (useCloudStorage && supabaseClient) {
-    try { await supabaseClient.from('filtros').delete().eq('id', id); } catch(e){}
+  if (supabaseClient && currentUser) {
+    try { 
+      await supabaseClient.from('filtros')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', currentUser.id); 
+    } catch(e){}
   }
   
   renderFiltrosList();
@@ -699,18 +794,15 @@ async function deleteFilter(id) {
   showToast('Filtro eliminado');
 }
 
-// --- 10. Service Worker y PWA ---
+// --- 11. Service Worker & Notificaciones PWA ---
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').then(() => {
-      console.log('Service Worker registrado con éxito.');
-    }).catch(err => {
-      console.warn('Fallo al registrar Service Worker:', err);
+    navigator.serviceWorker.register('./sw.js').catch(err => {
+      console.warn('Fallo SW:', err);
     });
   }
 }
 
-// Solicitar permisos de Notificaciones Push
 async function requestNotificationPermission() {
   if (!('Notification' in window)) {
     alert('Tu navegador no soporta notificaciones de escritorio.');
@@ -723,30 +815,22 @@ async function requestNotificationPermission() {
       body: 'Recibirás alertas cuando salgan nuevas convocatorias en el BOE que coincidan con tus filtros.',
       icon: './icon-192.png'
     });
-    showToast('Notificaciones activadas correctamente');
+    showToast('Notificaciones activadas');
   } else {
     showToast('Permiso de notificaciones denegado');
   }
 }
 
-// --- 11. Utilidades ---
+// --- 12. Utilidades ---
 function setupEventListeners() {
-  // Filtros reactivos
   document.getElementById('filter-category').addEventListener('change', applyFiltersAndRender);
   document.getElementById('filter-region').addEventListener('change', applyFiltersAndRender);
   document.getElementById('filter-hide-expired').addEventListener('change', applyFiltersAndRender);
   document.getElementById('filter-search').addEventListener('input', applyFiltersAndRender);
-  
-  // Rango de días en el BOE
   document.getElementById('filter-days').addEventListener('change', searchBOE);
-  
-  // Botón guardar filtro
   document.getElementById('btn-save-filter').addEventListener('click', saveCurrentFilter);
-  
-  // Botón refrescar BOE
   document.getElementById('btn-refresh-boe').addEventListener('click', searchBOE);
   
-  // Cerrar banner iOS
   const closeIos = document.getElementById('close-ios-banner');
   if (closeIos) {
     closeIos.addEventListener('click', () => {
@@ -765,7 +849,6 @@ function getDatesList(days) {
   for (let i = 0; i < days; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
-    // Omitir domingos (habitualmente no hay BOE)
     if (d.getDay() !== 0) {
       const y = d.getFullYear();
       const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -801,7 +884,7 @@ function showToast(message) {
       bottom: 85px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(15, 23, 42, 0.9);
+      background: rgba(15, 23, 42, 0.95);
       color: white;
       padding: 10px 18px;
       border-radius: 20px;
