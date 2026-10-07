@@ -1,5 +1,5 @@
-// OpoFinder - Service Worker v7 (Summarized listing & detailed requirements flow)
-const CACHE_NAME = 'opofinder-cache-v7';
+// OpoFinder - Service Worker v8 (Beta request & profile password change)
+const CACHE_NAME = 'opofinder-cache-v8';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

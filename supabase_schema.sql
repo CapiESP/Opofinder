@@ -54,3 +54,30 @@ CREATE POLICY "Usuarios gestionan sus propias oposiciones"
     TO authenticated 
     USING (auth.uid() = user_id) 
     WITH CHECK (auth.uid() = user_id);
+
+-- 5. Tabla de Solicitudes de Participación a la Beta
+CREATE TABLE IF NOT EXISTS public.solicitudes_beta (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    email TEXT NOT NULL,
+    mensaje TEXT NOT NULL,
+    estado TEXT DEFAULT 'pendiente' -- 'pendiente', 'aprobada', 'rechazada'
+);
+
+ALTER TABLE public.solicitudes_beta ENABLE ROW LEVEL SECURITY;
+
+-- Permitir a usuarios anónimos (o autenticados) enviar solicitudes de admisión
+DROP POLICY IF EXISTS "Cualquiera puede enviar solicitud de beta" ON public.solicitudes_beta;
+CREATE POLICY "Cualquiera puede enviar solicitud de beta" 
+    ON public.solicitudes_beta 
+    FOR INSERT 
+    TO anon, authenticated 
+    WITH CHECK (true);
+
+-- Permitir a usuarios autenticados consultar o gestionar solicitudes si son administradores
+DROP POLICY IF EXISTS "Lectura de solicitudes beta para administradores" ON public.solicitudes_beta;
+CREATE POLICY "Lectura de solicitudes beta para administradores" 
+    ON public.solicitudes_beta 
+    FOR SELECT 
+    TO authenticated 
+    USING (true);

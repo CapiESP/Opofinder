@@ -76,7 +76,95 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-// --- 4. Gestión de Autenticación (Login / Registro / Logout) ---
+// --- 4. Gestión de Autenticación & Solicitud de Beta ---
+function setAuthView(view) {
+  const loginForm = document.getElementById('auth-form');
+  const betaForm = document.getElementById('beta-request-form');
+  const tabLogin = document.getElementById('tab-btn-login');
+  const tabBeta = document.getElementById('tab-btn-beta');
+  const alertEl = document.getElementById('auth-alert');
+  const loginDisclaimer = document.getElementById('login-disclaimer-box');
+
+  if (alertEl) {
+    alertEl.style.display = 'none';
+    alertEl.textContent = '';
+  }
+
+  if (view === 'beta') {
+    if (loginForm) loginForm.style.display = 'none';
+    if (loginDisclaimer) loginDisclaimer.style.display = 'none';
+    if (betaForm) betaForm.style.display = 'block';
+    if (tabLogin) tabLogin.classList.remove('active');
+    if (tabBeta) tabBeta.classList.add('active');
+  } else {
+    if (loginForm) loginForm.style.display = 'block';
+    if (loginDisclaimer) loginDisclaimer.style.display = 'flex';
+    if (betaForm) betaForm.style.display = 'none';
+    if (tabLogin) tabLogin.classList.add('active');
+    if (tabBeta) tabBeta.classList.remove('active');
+  }
+}
+
+async function handleBetaRequestSubmit(e) {
+  e.preventDefault();
+  const emailInput = document.getElementById('beta-email');
+  const messageInput = document.getElementById('beta-message');
+  const submitBtn = document.getElementById('beta-submit-btn');
+  const alertEl = document.getElementById('auth-alert');
+
+  if (!emailInput || !messageInput) return;
+  const email = emailInput.value.trim();
+  const mensaje = messageInput.value.trim();
+
+  if (!email || !mensaje) return;
+
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = `<span>Registrando solicitud...</span>`;
+
+  try {
+    const client = getSupabaseClient();
+    if (!client) throw new Error('Servicio de conexión no disponible en este momento');
+
+    const { error } = await client.from('solicitudes_beta').insert([
+      {
+        email: email,
+        mensaje: mensaje,
+        estado: 'pendiente'
+      }
+    ]);
+
+    if (error) {
+      console.warn('Advertencia en Supabase solicitudes_beta:', error);
+      // Guardar también en respaldo local para garantizar que no se pierda la solicitud
+      const localQueue = JSON.parse(localStorage.getItem('opofinder_solicitudes_beta') || '[]');
+      localQueue.push({ email, mensaje, fecha: new Date().toISOString() });
+      localStorage.setItem('opofinder_solicitudes_beta', JSON.stringify(localQueue));
+    }
+
+    alertEl.className = 'auth-alert success';
+    alertEl.innerHTML = `
+      <strong>¡Solicitud de Beta enviada con éxito!</strong><br>
+      Hemos registrado tu solicitud para <em>${escapeHTML(email)}</em>. En cuanto sea aprobada por el administrador, recibirás tu contraseña provisional para acceder a OpoFinder.
+    `;
+    alertEl.style.display = 'block';
+
+    emailInput.value = '';
+    messageInput.value = '';
+    showToast('Solicitud a la Beta registrada');
+  } catch (err) {
+    console.error('Error al procesar solicitud beta:', err);
+    alertEl.className = 'auth-alert error';
+    alertEl.textContent = 'Hubo un problema registrando tu solicitud. Por favor inténtalo de nuevo.';
+    alertEl.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = `
+      <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      <span>Enviar Solicitud a la Beta</span>
+    `;
+  }
+}
+
 async function handleAuthSubmit(e) {
   e.preventDefault();
   const email = document.getElementById('auth-email').value.trim();
@@ -140,7 +228,6 @@ async function handleLogout() {
 function handleAuthState(session) {
   const authContainer = document.getElementById('auth-container');
   const appContent = document.getElementById('app-content');
-  const userEmailDisplay = document.getElementById('user-display-email');
   const loadingScreen = document.getElementById('login-loading-screen');
 
   if (session && session.user) {
@@ -148,9 +235,27 @@ function handleAuthState(session) {
     if (authContainer) authContainer.style.display = 'none';
     if (loadingScreen) loadingScreen.style.display = 'none';
     if (appContent) appContent.style.display = 'block';
-    if (userEmailDisplay) {
-      userEmailDisplay.textContent = currentUser.email;
+
+    const email = currentUser.email || '';
+    const initial = (email.charAt(0) || 'U').toUpperCase();
+
+    // Actualizar Inicial en el botón del Header
+    const avatarInitialEl = document.getElementById('user-avatar-initial');
+    const avatarBtn = document.getElementById('user-avatar-btn');
+    if (avatarInitialEl) {
+      avatarInitialEl.textContent = initial;
     }
+    if (avatarBtn) {
+      avatarBtn.title = `Perfil: ${email} (Clic para cambiar contraseña)`;
+    }
+
+    // Actualizar datos de perfil en el modal
+    const profileEmailSubtitle = document.getElementById('profile-email-subtitle');
+    const profileUserEmailText = document.getElementById('profile-user-email-text');
+    const profileLargeAvatar = document.getElementById('profile-large-avatar');
+    if (profileEmailSubtitle) profileEmailSubtitle.textContent = email;
+    if (profileUserEmailText) profileUserEmailText.textContent = email;
+    if (profileLargeAvatar) profileLargeAvatar.textContent = initial;
 
     // Cargar datos propios del usuario autenticado
     loadUserData();
@@ -160,6 +265,113 @@ function handleAuthState(session) {
     if (loadingScreen) loadingScreen.style.display = 'none';
     if (authContainer) authContainer.style.display = 'flex';
     if (appContent) appContent.style.display = 'none';
+  }
+}
+
+// --- 4.1 Gestión de Perfil & Configurar Nueva Contraseña ---
+function openProfileModal() {
+  if (!currentUser) return;
+  const modal = document.getElementById('profile-modal');
+  const emailSubtitle = document.getElementById('profile-email-subtitle');
+  const userEmailText = document.getElementById('profile-user-email-text');
+  const largeAvatar = document.getElementById('profile-large-avatar');
+  const alertEl = document.getElementById('profile-password-alert');
+
+  if (alertEl) {
+    alertEl.style.display = 'none';
+    alertEl.textContent = '';
+  }
+
+  const email = currentUser.email || '';
+  const initial = (email.charAt(0) || 'U').toUpperCase();
+
+  if (emailSubtitle) emailSubtitle.textContent = email;
+  if (userEmailText) userEmailText.textContent = email;
+  if (largeAvatar) largeAvatar.textContent = initial;
+
+  const newPass = document.getElementById('profile-new-password');
+  const confirmPass = document.getElementById('profile-confirm-password');
+  if (newPass) newPass.value = '';
+  if (confirmPass) confirmPass.value = '';
+
+  if (modal) {
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeProfileModal() {
+  const modal = document.getElementById('profile-modal');
+  if (modal) {
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+}
+
+function handleProfileOverlayClick(e) {
+  if (e.target && e.target.id === 'profile-modal') {
+    closeProfileModal();
+  }
+}
+
+async function handleUpdatePassword(e) {
+  e.preventDefault();
+  const newPass = document.getElementById('profile-new-password')?.value;
+  const confirmPass = document.getElementById('profile-confirm-password')?.value;
+  const submitBtn = document.getElementById('profile-password-submit-btn');
+  const alertEl = document.getElementById('profile-password-alert');
+
+  if (!alertEl) return;
+  alertEl.style.display = 'none';
+
+  if (!newPass || newPass.length < 6) {
+    alertEl.className = 'auth-alert error';
+    alertEl.textContent = 'La nueva contraseña debe tener un mínimo de 6 caracteres.';
+    alertEl.style.display = 'block';
+    return;
+  }
+
+  if (newPass !== confirmPass) {
+    alertEl.className = 'auth-alert error';
+    alertEl.textContent = 'Las contraseñas no coinciden. Verifícalas e inténtalo de nuevo.';
+    alertEl.style.display = 'block';
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = `<span>Actualizando contraseña...</span>`;
+
+  try {
+    const client = getSupabaseClient();
+    if (!client) throw new Error('Cliente de Supabase no disponible');
+
+    const { data, error } = await client.auth.updateUser({
+      password: newPass
+    });
+
+    if (error) throw error;
+
+    alertEl.className = 'auth-alert success';
+    alertEl.textContent = '¡Contraseña actualizada con éxito! Tu nueva clave personal ya está activa.';
+    alertEl.style.display = 'block';
+
+    const p1 = document.getElementById('profile-new-password');
+    const p2 = document.getElementById('profile-confirm-password');
+    if (p1) p1.value = '';
+    if (p2) p2.value = '';
+
+    showToast('Contraseña personal actualizada');
+  } catch (err) {
+    console.error('Error al actualizar contraseña:', err);
+    alertEl.className = 'auth-alert error';
+    alertEl.textContent = err.message || 'No se pudo actualizar la contraseña. Comprueba tu conexión.';
+    alertEl.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = `
+      <svg class="icon-inline" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+      <span>Guardar Nueva Contraseña</span>
+    `;
   }
 }
 

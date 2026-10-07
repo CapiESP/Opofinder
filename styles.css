@@ -181,6 +181,58 @@ body {
   border: 1px solid var(--success);
 }
 
+.auth-mode-tabs {
+  display: flex;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 18px;
+  gap: 3px;
+}
+
+.auth-mode-tab {
+  flex: 1;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  font-family: inherit;
+}
+
+.auth-mode-tab.active {
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.auth-switch-link {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 6px;
+  text-decoration: none;
+  font-family: inherit;
+  transition: color 0.15s ease;
+}
+
+.auth-switch-link strong {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.auth-switch-link:hover strong {
+  color: var(--primary-hover);
+}
+
 /* ==================== 2. HEADER INSTITUCIONAL ==================== */
 .app-header {
   background-color: var(--bg-header);
@@ -254,6 +306,32 @@ body {
 
 .theme-toggle-btn:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+.user-avatar-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1e3a8a, #0284c7);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  padding: 0;
+  font-family: inherit;
+}
+
+.user-avatar-btn:hover {
+  transform: scale(1.08);
+  border-color: #ffffff;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.45);
 }
 
 .user-pill {
@@ -1137,6 +1215,47 @@ body {
   overflow: hidden;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   animation: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.profile-modal-card {
+  max-width: 480px;
+}
+
+.profile-user-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  border-radius: 10px;
+}
+
+.profile-large-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1e3a8a, #0284c7);
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.profile-user-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-section {
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
 }
 
 @keyframes modalIn {
