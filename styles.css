@@ -1370,6 +1370,8 @@ body {
   font-weight: 700;
   z-index: 1;
   color: var(--text-muted);
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .timeline-step.completed .timeline-dot {
@@ -1385,16 +1387,23 @@ body {
   box-shadow: 0 0 0 4px var(--gold-bg);
 }
 
+.timeline-content {
+  flex: 1;
+  min-width: 0;
+}
+
 .timeline-content h4 {
   font-size: 14px;
   font-weight: 700;
   color: var(--text-main);
+  line-height: 1.35;
 }
 
 .timeline-content p {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 2px;
+  line-height: 1.45;
 }
 
 /* Interruptor de Alertas de Cambios */

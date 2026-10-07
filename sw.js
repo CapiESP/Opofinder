@@ -1,5 +1,5 @@
-// OpoFinder - Service Worker v8 (Beta request & profile password change)
-const CACHE_NAME = 'opofinder-cache-v8';
+// OpoFinder - Service Worker v9 (Timeline alignment and single active step fix)
+const CACHE_NAME = 'opofinder-cache-v9';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

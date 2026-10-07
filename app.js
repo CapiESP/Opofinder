@@ -1790,6 +1790,24 @@ function renderModalHitos(container, opo) {
   const isOep = opo.tipo === 'Oferta OEP';
   const isCerrado = !isOep && opo.diasRestantes < 0;
 
+  // Determinar dinámicamente cuál es la fase activa (solo una activa en color oro)
+  let currentStep = 3; // Por defecto en convocatorias: Plazo de Solicitudes Abierto
+  if (isOep) {
+    currentStep = 2; // OEP aprobada, pendiente de publicación de Bases y Convocatoria
+  } else if (isCerrado) {
+    if (opo.fechaExamen) {
+      currentStep = 5; // Plazo cerrado y fecha de examen ya convocada
+    } else {
+      currentStep = 4; // Plazo cerrado, en trámite de listas de admitidos
+    }
+  }
+
+  const getStepClass = (stepNum) => {
+    if (stepNum < currentStep) return 'completed';
+    if (stepNum === currentStep) return 'current';
+    return '';
+  };
+
   container.innerHTML = `
     <!-- Resumen del Estado -->
     <div style="background: var(--bg-subtle); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; border: 1px solid var(--border);">
@@ -1808,13 +1826,13 @@ function renderModalHitos(container, opo) {
     </div>
 
     <!-- Timeline del Ciclo de Vida -->
-    <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--text-main);">
+    <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 12px; color: var(--text-main);">
       Fases del Procedimiento Selectivo
     </h4>
 
     <div class="lifecycle-timeline">
       <!-- Paso 1 -->
-      <div class="timeline-step completed">
+      <div class="timeline-step ${getStepClass(1)}">
         <div class="timeline-dot">1</div>
         <div class="timeline-content">
           <h4>1. Publicación de la OEP</h4>
@@ -1823,7 +1841,7 @@ function renderModalHitos(container, opo) {
       </div>
 
       <!-- Paso 2 -->
-      <div class="timeline-step ${isOep ? 'current' : 'completed'}">
+      <div class="timeline-step ${getStepClass(2)}">
         <div class="timeline-dot">2</div>
         <div class="timeline-content">
           <h4>2. Publicación de Bases y Convocatoria</h4>
@@ -1832,7 +1850,7 @@ function renderModalHitos(container, opo) {
       </div>
 
       <!-- Paso 3 -->
-      <div class="timeline-step ${isOep ? '' : (isCerrado ? 'completed' : 'current')}">
+      <div class="timeline-step ${getStepClass(3)}">
         <div class="timeline-dot">3</div>
         <div class="timeline-content">
           <h4>3. Plazo de Presentación de Solicitudes</h4>
@@ -1841,7 +1859,7 @@ function renderModalHitos(container, opo) {
       </div>
 
       <!-- Paso 4 -->
-      <div class="timeline-step">
+      <div class="timeline-step ${getStepClass(4)}">
         <div class="timeline-dot">4</div>
         <div class="timeline-content">
           <h4>4. Listas Provisionales de Admitidos y Excluidos</h4>
@@ -1849,19 +1867,21 @@ function renderModalHitos(container, opo) {
         </div>
       </div>
 
-      <!-- Paso 5: Clave Fecha de Examen -->
-      <div class="timeline-step" style="background: var(--bg-subtle); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
-        <div class="timeline-dot" style="background: var(--gold); color: #fff; border-color: var(--gold);">5</div>
+      <!-- Paso 5: Fecha de Examen -->
+      <div class="timeline-step ${getStepClass(5)}">
+        <div class="timeline-dot">5</div>
         <div class="timeline-content">
-          <h4 style="color: var(--text-main);">5. Fecha de Examen y Sedes Oficiales</h4>
-          <p style="color: var(--text-muted); font-weight: 500;">
-            ${opo.fechaExamen ? `Fecha anunciada: <strong>${opo.fechaExamen}</strong>` : 'Pendiente de resolución por el Tribunal Calificador.'}
+          <h4>5. Fecha de Examen y Sedes Oficiales</h4>
+          <p>
+            ${opo.fechaExamen 
+              ? `Fecha anunciada: <strong style="color: var(--gold);">${escapeHTML(opo.fechaExamen)}</strong>` 
+              : 'Pendiente de resolución por el Tribunal Calificador.'}
           </p>
         </div>
       </div>
 
       <!-- Paso 6 -->
-      <div class="timeline-step">
+      <div class="timeline-step ${getStepClass(6)}">
         <div class="timeline-dot">6</div>
         <div class="timeline-content">
           <h4>6. Celebración del Ejercicio y Calificaciones</h4>
