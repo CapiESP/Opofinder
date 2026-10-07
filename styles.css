@@ -6,6 +6,8 @@
 /* --- TEMA CLARO (Por Defecto) --- */
 :root, [data-theme="light"] {
   --bg-main: #f8fafc;
+  --bg-animated: linear-gradient(135deg, #f8fafc 0%, #eef4fc 25%, #f1f5f9 50%, #edf2fa 75%, #f8fafc 100%);
+  --auth-bg-animated: linear-gradient(135deg, #0a1424 0%, #11284d 45%, #0d1e38 75%, #08111e 100%);
   --bg-card: #ffffff;
   --bg-subtle: #f1f5f9;
   --bg-header: #0f1e36;        /* Azul marino institucional profundo */
@@ -31,7 +33,9 @@
 
 /* --- TEMA OSCURO --- */
 [data-theme="dark"] {
-  --bg-main: #090f1a;          /* Fondo azul noche muy oscuro */
+  --bg-main: #090f1a;
+  --bg-animated: linear-gradient(135deg, #070c14 0%, #0d1728 30%, #091322 65%, #060b13 100%);
+  --auth-bg-animated: linear-gradient(135deg, #050a12 0%, #09172e 45%, #060e1d 75%, #03070d 100%);
   --bg-card: #111b2b;          /* Tarjeta azul noche */
   --bg-subtle: #192539;
   --bg-header: #060b13;
@@ -62,12 +66,70 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background-color: var(--bg-main);
+  background: var(--bg-animated);
+  background-size: 250% 250%;
+  animation: ambientBgDrift 22s ease infinite;
   color: var(--text-main);
   line-height: 1.5;
   min-height: 100vh;
   padding-bottom: calc(75px + var(--safe-bottom));
-  transition: background-color 0.25s ease, color 0.25s ease;
+  position: relative;
+  overflow-x: hidden;
+  transition: color 0.25s ease;
+}
+
+@keyframes ambientBgDrift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Efecto de orbes ambientales fluidos */
+.ambient-glow-orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(85px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.35;
+}
+
+[data-theme="dark"] .ambient-glow-orb {
+  opacity: 0.18;
+}
+
+.ambient-glow-orb-1 {
+  top: -80px;
+  left: -80px;
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.28), transparent 70%);
+  animation: subtleOrbFloat1 18s ease-in-out infinite;
+}
+
+.ambient-glow-orb-2 {
+  bottom: -100px;
+  right: -80px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(15, 43, 92, 0.25), transparent 70%);
+  animation: subtleOrbFloat2 24s ease-in-out infinite;
+}
+
+@keyframes subtleOrbFloat1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(35px, -25px) scale(1.08); }
+}
+
+@keyframes subtleOrbFloat2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-30px, 35px) scale(0.94); }
 }
 
 /* ==================== 1. PANTALLA DE ACCESO (AUTH) ==================== */
@@ -77,30 +139,52 @@ body {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: radial-gradient(circle at 50% 20%, #1e3a6c 0%, #09111e 100%);
+  position: relative;
+  overflow: hidden;
+  background: var(--auth-bg-animated);
+  background-size: 250% 250%;
+  animation: ambientBgDrift 16s ease infinite;
+  z-index: 1;
 }
 
 .auth-card {
   background: var(--bg-card);
   width: 100%;
-  max-width: 430px;
+  max-width: 420px;
   border-radius: 14px;
-  padding: 32px 26px;
+  padding: 32px 24px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border);
+  position: relative;
+  z-index: 2;
+  margin: auto;
 }
 
 .auth-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 22px;
+  width: 100%;
+}
+
+.auth-logo-box {
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 12px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .auth-logo-img {
-  width: 64px;
-  height: 64px;
+  width: 58px;
+  height: 58px;
   border-radius: 12px;
-  margin-bottom: 12px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  display: block;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .auth-title {
@@ -108,35 +192,30 @@ body {
   font-weight: 700;
   letter-spacing: -0.3px;
   color: var(--text-main);
+  margin: 0;
+  text-align: center;
 }
 
 .auth-subtitle {
   font-size: 13px;
   color: var(--text-muted);
-  margin-top: 4px;
+  margin: 4px 0 0 0;
+  text-align: center;
 }
 
-.beta-tag-pill {
+/* Distintivo Minimalista en vez de la pastilla estilo IA */
+.auth-badge-minimal {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: rgba(180, 83, 9, 0.12);
-  border: 1px solid rgba(180, 83, 9, 0.3);
-  color: var(--gold);
+  padding: 3px 10px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
   border-radius: 20px;
-  margin-bottom: 12px;
-  text-transform: uppercase;
-}
-
-.beta-status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--gold);
+  margin-top: 10px;
 }
 
 .beta-disclaimer-box {
@@ -375,7 +454,6 @@ body {
 .ios-banner {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
-  border-left: 4px solid var(--primary);
   border-radius: 10px;
   padding: 12px 14px;
   margin-bottom: 16px;
@@ -812,7 +890,8 @@ body {
 }
 
 .opo-card.saved-highlight {
-  border-left: 4px solid var(--gold);
+  border-color: rgba(180, 83, 9, 0.4);
+  box-shadow: 0 2px 8px rgba(180, 83, 9, 0.08);
 }
 
 .card-summary-header {
@@ -1606,12 +1685,14 @@ body {
   stroke: var(--gold);
 }
 
-/* ==================== 11. PANTALLA DE CARGA CORPORATIVA ==================== */
+/* ==================== 11. PANTALLA DE CARGA CORPORATIVA CIRCULAR ==================== */
 .login-loading-screen {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: radial-gradient(circle at 50% 30%, #152744 0%, #080f1a 100%);
+  background: var(--auth-bg-animated);
+  background-size: 250% 250%;
+  animation: ambientBgDrift 16s ease infinite;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1624,48 +1705,76 @@ body {
   border-radius: 16px;
   padding: 36px 28px;
   width: 100%;
-  max-width: 400px;
+  max-width: 380px;
   text-align: center;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-.loading-emblem-wrap {
+.circular-progress-wrap {
   position: relative;
-  width: 72px;
-  height: 72px;
-  margin-bottom: 20px;
+  width: 110px;
+  height: 110px;
+  margin: 0 auto 20px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.loading-emblem {
-  width: 100%;
-  height: 100%;
-  border-radius: 14px;
-  border: 1px solid var(--border);
+.circular-progress-svg {
+  width: 110px;
+  height: 110px;
+  transform: rotate(-90deg);
 }
 
-.loading-spinner-ring {
+.circle-bg {
+  fill: none;
+  stroke: var(--bg-subtle);
+  stroke-width: 6;
+}
+
+.circle-progress {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 314.16;
+  stroke-dashoffset: 314.16;
+  transition: stroke-dashoffset 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.circular-progress-center {
   position: absolute;
-  top: -6px;
-  left: -6px;
-  right: -6px;
-  bottom: -6px;
-  border: 2px solid transparent;
-  border-top-color: var(--gold);
-  border-right-color: var(--gold);
-  border-radius: 18px;
-  animation: spinRing 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
 }
 
-@keyframes spinRing {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.circular-progress-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.circular-progress-percent {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
 }
 
 .loading-title {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--text-main);
   margin-bottom: 6px;
@@ -1674,42 +1783,21 @@ body {
 .loading-step {
   font-size: 13px;
   color: var(--text-muted);
-  margin-bottom: 22px;
+  margin-bottom: 20px;
   min-height: 20px;
 }
 
-.loading-meter {
-  width: 100%;
-  height: 4px;
-  background: var(--bg-subtle);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-bottom: 20px;
-}
-
-.loading-meter-bar {
-  height: 100%;
-  width: 40%;
-  background: var(--gold);
-  border-radius: 2px;
-  animation: loadingMeterAnim 1.8s ease-in-out infinite;
-}
-
-@keyframes loadingMeterAnim {
-  0% { width: 10%; transform: translateX(0); }
-  50% { width: 60%; transform: translateX(40%); }
-  100% { width: 100%; transform: translateX(0); }
-}
-
-.loading-security-badge {
+.loading-security-badge-minimal {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 11px;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 600;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 10px;
+  letter-spacing: 0.2px;
 }
 
 /* ==================== 12. CONFIGURACIÓN DE AVISOS EN EL TERMINAL ==================== */
@@ -2019,7 +2107,6 @@ body {
 .boe-linked-syllabus-section {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-left: 4px solid var(--primary);
   border-radius: 10px;
   padding: 14px;
   margin-bottom: 16px;

@@ -1,5 +1,5 @@
-// OpoFinder - Service Worker v10 (Biblioteca Juridica Digital BOE y Temarios)
-const CACHE_NAME = 'opofinder-cache-v10';
+// OpoFinder - Service Worker v11 (Minimalist UI & Animated Ambient Background)
+const CACHE_NAME = 'opofinder-cache-v11';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

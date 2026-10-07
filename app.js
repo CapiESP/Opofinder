@@ -165,6 +165,116 @@ async function handleBetaRequestSubmit(e) {
   }
 }
 
+// --- SÍNTESIS DE AUDIO PARA AUTENTICACIÓN (WEB AUDIO API) ---
+let authAudioCtx = null;
+
+function getAuthAudioContext() {
+  try {
+    if (!authAudioCtx) {
+      const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtxClass) {
+        authAudioCtx = new AudioCtxClass();
+      }
+    }
+    if (authAudioCtx && authAudioCtx.state === 'suspended') {
+      authAudioCtx.resume();
+    }
+    return authAudioCtx;
+  } catch (e) {
+    return null;
+  }
+}
+
+function playAuthAudio(type) {
+  try {
+    const ctx = getAuthAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    if (type === 'start') {
+      // Tono suave ambiental de fondo (onda senoidal cálida, volumen tenue)
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(329.63, now + 0.6);
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.035, now + 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 1.1);
+    } else if (type === 'step') {
+      // Pulso de precisión al avanzar etapas
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, now);
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.025, now + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.22);
+    } else if (type === 'success') {
+      // Acorde armónico de bienvenida corporativo (C5, E5, G5, C6)
+      const notes = [523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const start = now + (idx * 0.05);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.001, start);
+        gain.gain.linearRampToValueAtTime(0.04, start + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.85);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.9);
+      });
+    } else if (type === 'error') {
+      // Tono suave descendente ante error
+      [311.13, 277.18].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const start = now + (idx * 0.12);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.001, start);
+        gain.gain.linearRampToValueAtTime(0.03, start + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.3);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.35);
+      });
+    }
+  } catch (e) {
+    console.debug('Audio playback skipped:', e);
+  }
+}
+
+function updateLoadingProgress(percent, stepText) {
+  const circle = document.getElementById('loading-circle-progress');
+  const percentEl = document.getElementById('loading-circle-percent');
+  const stepEl = document.getElementById('loading-step-text');
+  
+  if (circle) {
+    const circumference = 314.16; // 2 * Math.PI * 50
+    const offset = circumference - (circumference * (percent / 100));
+    circle.style.strokeDashoffset = offset;
+  }
+  if (percentEl) {
+    percentEl.textContent = `${Math.round(percent)}%`;
+  }
+  if (stepEl && stepText) {
+    stepEl.textContent = stepText;
+  }
+}
+
 async function handleAuthSubmit(e) {
   e.preventDefault();
   const email = document.getElementById('auth-email').value.trim();
@@ -172,33 +282,41 @@ async function handleAuthSubmit(e) {
   const submitBtn = document.getElementById('auth-submit-btn');
   const alertEl = document.getElementById('auth-alert');
   const loadingScreen = document.getElementById('login-loading-screen');
-  const loadingStep = document.getElementById('loading-step-text');
 
   if (!email || !password) return;
 
   submitBtn.disabled = true;
   alertEl.style.display = 'none';
 
-  // Activar pantalla de carga corporativa
+  // Activar pantalla de carga circular con sonido de inicio
   if (loadingScreen) {
     loadingScreen.style.display = 'flex';
-    if (loadingStep) loadingStep.textContent = 'Verificando credenciales oficiales...';
+    updateLoadingProgress(15, 'Verificando credenciales oficiales...');
+    playAuthAudio('start');
   }
 
   try {
     const client = getSupabaseClient();
     if (!client) throw new Error('No se pudo conectar con el servidor de autenticación');
 
+    await new Promise(r => setTimeout(r, 200));
+    updateLoadingProgress(45, 'Autenticando canal seguro...');
+    playAuthAudio('step');
+
     const { data, error } = await client.auth.signInWithPassword({ email, password });
     if (error) throw error;
 
-    if (loadingStep) {
-      loadingStep.textContent = 'Sincronizando convocatorias del BOE y CCAA...';
-    }
-    await new Promise(r => setTimeout(r, 650));
+    updateLoadingProgress(85, 'Sincronizando convocatorias del BOE y CCAA...');
+    playAuthAudio('step');
+    await new Promise(r => setTimeout(r, 350));
 
-    showToast('Sesión autorizada en Beta Cerrada');
+    updateLoadingProgress(100, 'Acceso autorizado correctamente');
+    playAuthAudio('success');
+    await new Promise(r => setTimeout(r, 400));
+
+    showToast('Sesión autorizada en Beta Privada');
   } catch (err) {
+    playAuthAudio('error');
     console.error('Error de autenticación:', err);
     if (loadingScreen) loadingScreen.style.display = 'none';
     alertEl.className = 'auth-alert error';

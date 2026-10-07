@@ -16,25 +16,28 @@
   <link rel="icon" type="image/png" href="favicon.png">
   
   <!-- Estilos Corporativos (Modo Claro & Oscuro) -->
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=11">
   
   <!-- Supabase JS Client (v2) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-  <!-- ==================== 1. PANTALLA DE ACCESO (BETA CERRADA) ==================== -->
+  <!-- Elementos de Fondo Animado Global -->
+  <div class="ambient-glow-orb ambient-glow-orb-1" aria-hidden="true"></div>
+  <div class="ambient-glow-orb ambient-glow-orb-2" aria-hidden="true"></div>
+
+  <!-- ==================== 1. PANTALLA DE ACCESO (BETA PRIVADA) ==================== -->
   <div id="auth-container" class="auth-wrapper">
     <div class="auth-card">
       
       <div class="auth-header">
-        <img src="icon-192.png" alt="OpoFinder Emblem" class="auth-logo-img">
-        <div class="beta-tag-pill">
-          <span class="beta-status-dot"></span>
-          BETA CERRADA &bull; ACCESO PRIVADO
+        <div class="auth-logo-box">
+          <img src="icon-192.png" alt="OpoFinder" class="auth-logo-img">
         </div>
         <h2 class="auth-title">OpoFinder</h2>
-        <p class="auth-subtitle">Sistema Integrado de Convocatorias y Empleo Público</p>
+        <p class="auth-subtitle">Convocatorias Oficiales del Estado & CCAA</p>
+        <span class="auth-badge-minimal">Beta Privada</span>
       </div>
 
       <!-- Pestañas para Alternar entre Acceso y Solicitud de Beta -->
@@ -109,22 +112,25 @@
     </div>
   </div>
 
-  <!-- ==================== PANTALLA DE CARGA CORPORATIVA ==================== -->
+  <!-- ==================== PANTALLA DE CARGA CORPORATIVA CIRCULAR ==================== -->
   <div id="login-loading-screen" class="login-loading-screen" style="display: none;">
     <div class="loading-card">
-      <div class="loading-emblem-wrap">
-        <img src="icon-192.png" alt="OpoFinder" class="loading-emblem">
-        <div class="loading-spinner-ring"></div>
+      <div class="circular-progress-wrap">
+        <svg class="circular-progress-svg" viewBox="0 0 120 120">
+          <circle class="circle-bg" cx="60" cy="60" r="50"></circle>
+          <circle class="circle-progress" id="loading-circle-progress" cx="60" cy="60" r="50"></circle>
+        </svg>
+        <div class="circular-progress-center">
+          <img src="icon-192.png" alt="OpoFinder" class="circular-progress-logo">
+          <span class="circular-progress-percent" id="loading-circle-percent">0%</span>
+        </div>
       </div>
-      <h3 class="loading-title">Verificando Credenciales</h3>
+      <h3 class="loading-title">Verificando Acceso</h3>
       <p class="loading-step" id="loading-step-text">Conectando con el servidor oficial...</p>
-      <div class="loading-meter">
-        <div class="loading-meter-bar" id="loading-meter-bar"></div>
-      </div>
-      <span class="loading-security-badge">
+      <div class="loading-security-badge-minimal">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-        Canal Encriptado &bull; Supabase Auth
-      </span>
+        <span>Acceso Cifrado &bull; Supabase Auth</span>
+      </div>
     </div>
   </div>
 
@@ -203,7 +209,7 @@
       </div>
 
       <!-- Banner de Alerta de Convocatorias Coincidentes -->
-      <div class="ios-banner" id="alert-banner" style="display: none; border-left-color: var(--gold);">
+      <div class="ios-banner" id="alert-banner" style="display: none;">
         <div class="ios-banner-text">
           <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
           <span id="alert-banner-text">Nuevas convocatorias coincidentes con tus criterios.</span>
@@ -725,7 +731,7 @@
   </div>
 
   <!-- Scripts de la Aplicación -->
-  <script src="boe_codigos.js?v=10"></script>
-  <script src="app.js?v=10"></script>
+  <script src="boe_codigos.js?v=11"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>
