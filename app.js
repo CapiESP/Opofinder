@@ -35,7 +35,7 @@ const state = {
   loading: false,
   alertCount: 0,
   currentModalOpo: null,  // Oposición actualmente abierta en el modal
-  currentModalTab: 'hitos'// 'hitos', 'temario', 'notas'
+  currentModalTab: 'requerimientos'// 'requerimientos', 'temario', 'boletin', 'notas'
 };
 
 // --- 3. Inicialización al Cargar el DOM ---
@@ -876,33 +876,16 @@ function renderCards(list, containerEl) {
 
 function createCardHTML(item) {
   const isSaved = state.guardadas.some(g => g.id === item.id);
-  
-  let trafficHtml = '';
-  if (item.tipo === 'Oferta OEP') {
-    trafficHtml = `<span class="traffic-light"><span class="status-dot status-dot-gray"></span> Oferta OEP Aprobada</span>`;
-  } else if (item.diasRestantes < 0) {
-    trafficHtml = `<span class="traffic-light traffic-red"><span class="status-dot status-dot-red"></span> Plazo cerrado</span>`;
-  } else if (item.diasRestantes === 0) {
-    trafficHtml = `<span class="traffic-light traffic-red"><span class="status-dot status-dot-red"></span> Último día de solicitudes</span>`;
-  } else if (item.diasRestantes <= 5) {
-    trafficHtml = `<span class="traffic-light traffic-yellow"><span class="status-dot status-dot-yellow"></span> Quedan ${item.diasRestantes} días</span>`;
-  } else {
-    trafficHtml = `<span class="traffic-light traffic-green"><span class="status-dot status-dot-green"></span> Plazo abierto (${item.diasRestantes} días)</span>`;
-  }
-  
-  const boletinName = item.boletin || 'BOE';
-  const plazasText = item.plazas ? `${item.plazas} ${item.plazas === 1 ? 'plaza' : 'plazas'}` : '';
-  const tipoBadgeClass = item.tipo === 'Oferta OEP' ? 'badge-oep' : 'badge-convocatoria';
-  
+  const plazasCount = item.plazas || 1;
+  const plazasText = `${plazasCount} ${plazasCount === 1 ? 'plaza' : 'plazas'}`;
+
   return `
     <div class="opo-card ${isSaved ? 'saved-highlight' : ''}" id="card-${item.id}" onclick="openDetailModal('${item.id}')">
-      <div class="card-top">
+      <div class="card-summary-header">
         <div class="badges-row">
-          <span class="badge ${tipoBadgeClass}">${item.tipo || 'Convocatoria'}</span>
           <span class="badge badge-${item.categoria.toLowerCase()}">${item.categoria}</span>
-          <span class="badge badge-region">${item.region}</span>
-          ${plazasText ? `<span class="badge badge-plazas">${plazasText}</span>` : ''}
-          <span class="badge badge-boletin">${boletinName}</span>
+          <span class="badge badge-region">${escapeHTML(item.region)}</span>
+          <span class="badge badge-plazas">${plazasText}</span>
         </div>
         <button class="btn-bookmark ${isSaved ? 'active' : ''}" onclick="event.stopPropagation(); toggleBookmark('${item.id}')" title="${isSaved ? 'Quitar de guardadas' : 'Guardar oposición'}">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="${isSaved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -911,62 +894,22 @@ function createCardHTML(item) {
         </button>
       </div>
       
-      <h3 class="card-title">${escapeHTML(item.titulo)}</h3>
-      <div class="card-organismo">
-        <svg class="icon-inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -2px;">
-          <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
-          <line x1="9" y1="22" x2="9" y2="18"></line>
-          <line x1="15" y1="22" x2="15" y2="18"></line>
-          <line x1="9" y1="18" x2="15" y2="18"></line>
-        </svg>
-        ${escapeHTML(item.organismo)}
-      </div>
+      <h3 class="card-summary-title">${escapeHTML(item.titulo)}</h3>
       
-      <div class="card-meta-grid">
-        <div class="meta-item">
-          <span class="meta-label">Publicado en ${boletinName}:</span>
-          <span class="meta-value">${item.fechaPublicacion}</span>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Plazo de solicitudes:</span>
-          <span class="meta-value">${item.plazoLimite || 'Ver bases oficiales'}</span>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Estado de la fase:</span>
-          <div class="meta-value">${trafficHtml}</div>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">Fecha del examen:</span>
-          <span class="meta-value" style="color: var(--text-muted); font-style: italic;">Pendiente de resolución</span>
-        </div>
-      </div>
-      
-      <div class="card-actions">
-        <button class="btn-view-detail" onclick="event.stopPropagation(); openDetailModal('${item.id}')">
-          <svg class="icon-inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+      <div class="card-summary-footer">
+        <span class="card-summary-org" title="${escapeHTML(item.organismo)}">
+          <svg class="icon-inline" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 3px; vertical-align: -1px;">
+            <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+            <line x1="9" y1="22" x2="9" y2="18"></line>
+            <line x1="15" y1="22" x2="15" y2="18"></line>
+            <line x1="9" y1="18" x2="15" y2="18"></line>
           </svg>
-          <span>Temario & Hitos</span>
-        </button>
-        <a href="${item.urlOficial}" target="_blank" rel="noopener" onclick="event.stopPropagation();" class="btn btn-outline btn-sm">
-          <svg class="icon-inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-            <polyline points="15 3 21 3 21 9"></polyline>
-            <line x1="10" y1="14" x2="21" y2="3"></line>
-          </svg>
-          <span>${boletinName}</span>
-        </a>
-        <a href="${item.urlPdf}" target="_blank" rel="noopener" download="${item.id}.pdf" onclick="event.stopPropagation();" class="btn-download-pdf">
-          <svg class="icon-inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="12" y1="18" x2="12" y2="12"></line>
-            <line x1="9" y1="15" x2="12" y2="18"></line>
-            <line x1="15" y1="15" x2="12" y2="18"></line>
-          </svg>
-          <span>Bases PDF</span>
-        </a>
+          ${escapeHTML(item.organismo)}
+        </span>
+        <span class="card-summary-cta">
+          <span>Ver ficha completa</span>
+          <svg class="icon-inline" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </span>
       </div>
     </div>
   `;
@@ -1438,21 +1381,24 @@ function applyTheme(theme) {
   }
 }
 
-// --- 14. Modal de Detalle, Hitos & Temario ---
+// --- 14. Modal de Detalle, Requerimientos, Temario & Hitos ---
 function openDetailModal(id) {
   const opo = state.oposiciones.find(o => o.id === id) || state.guardadas.find(g => g.id === id);
   if (!opo) return;
 
   state.currentModalOpo = opo;
-  state.currentModalTab = 'hitos';
+  state.currentModalTab = 'requerimientos';
 
   const titleEl = document.getElementById('modal-opo-title');
   const orgEl = document.getElementById('modal-opo-organismo');
+  const plazasCount = opo.plazas || 1;
+  const plazasText = `${plazasCount} ${plazasCount === 1 ? 'plaza' : 'plazas'}`;
+
   if (titleEl) titleEl.textContent = opo.titulo;
-  if (orgEl) orgEl.textContent = `🏛️ ${opo.organismo} • ${opo.region} • ${opo.categoria}`;
+  if (orgEl) orgEl.textContent = `${opo.organismo} • ${opo.region} • ${opo.categoria} • ${plazasText}`;
 
   document.querySelectorAll('.modal-tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.getAttribute('data-modaltab') === 'hitos');
+    btn.classList.toggle('active', btn.getAttribute('data-modaltab') === 'requerimientos');
   });
 
   renderModalContent();
@@ -1492,13 +1438,138 @@ function renderModalContent() {
   const opo = state.currentModalOpo;
   if (!container || !opo) return;
 
-  if (state.currentModalTab === 'hitos') {
-    renderModalHitos(container, opo);
+  if (state.currentModalTab === 'requerimientos') {
+    renderModalRequerimientos(container, opo);
   } else if (state.currentModalTab === 'temario') {
     renderModalTemario(container, opo);
+  } else if (state.currentModalTab === 'boletin' || state.currentModalTab === 'hitos') {
+    renderModalHitos(container, opo);
   } else if (state.currentModalTab === 'notas') {
     renderModalNotas(container, opo);
   }
+}
+
+function getRequerimientosForOposicion(opo) {
+  const cat = (opo.categoria || '').toUpperCase();
+  const title = (opo.titulo || '').toLowerCase();
+  
+  let titulacion = 'Título de Bachiller, Formación Profesional de Grado Medio o titulación académica equivalente.';
+  let tagTitulacion = 'Bachiller o equivalente';
+  
+  if (cat === 'C2') {
+    titulacion = 'Título de Graduado en Educación Secundaria Obligatoria (ESO), Graduado Escolar o titulación equivalente.';
+    tagTitulacion = 'Graduado en ESO (Mínimo C2)';
+  } else if (cat === 'C1') {
+    titulacion = 'Título de Bachiller, Técnico de Formación Profesional (Grado Medio) o titulación equivalente.';
+    tagTitulacion = 'Bachillerato o Técnico FP (C1)';
+  } else if (cat === 'A2') {
+    titulacion = 'Título Universitario oficial de Grado, Diplomatura Universitaria, Ingeniería Técnica o Arquitectura Técnica (240 créditos ECTS).';
+    tagTitulacion = 'Grado Universitario / Diplomatura (A2)';
+  } else if (cat === 'A1') {
+    titulacion = 'Título Universitario oficial de Grado, Licenciatura, Máster Universitario oficial, Ingeniería Superior o Arquitectura.';
+    tagTitulacion = 'Grado / Licenciatura / Máster (A1)';
+  } else if (cat === 'B') {
+    titulacion = 'Título de Técnico Superior de Formación Profesional (Ciclo Formativo de Grado Superior).';
+    tagTitulacion = 'Técnico Superior FP (Subgrupo B)';
+  } else if (cat === 'AP') {
+    titulacion = 'Sin titulación académica formal requerida (Agrupaciones Profesionales sin exigencia de titulación previa).';
+    tagTitulacion = 'Sin titulación académica (AP)';
+  }
+
+  let especificos = 'Haber abonado la tasa por derechos de examen y formalizar la solicitud telemática dentro del plazo oficial.';
+  if (title.includes('polic') || title.includes('guardia')) {
+    especificos = 'Permiso de conducción de clase B en vigor, compromiso formal de portar armas de fuego y superar el cuadro de aptitud médica y pruebas físicas.';
+  } else if (title.includes('bomber')) {
+    especificos = 'Permiso de conducción de clase C (o C+E) en vigor y acreditar aptitud médica conforme al cuadro oficial de exclusiones.';
+  } else if (title.includes('sanitar') || title.includes('enferm') || title.includes('médic')) {
+    especificos = 'Colegiación preceptiva en el correspondiente colegio profesional y certificación negativa del Registro Central de Delincuentes Sexuales.';
+  }
+
+  return { titulacion, tagTitulacion, especificos };
+}
+
+function renderModalRequerimientos(container, opo) {
+  const reqs = getRequerimientosForOposicion(opo);
+  const boletinName = opo.boletin || 'BOE';
+
+  container.innerHTML = `
+    <!-- Acceso Directo al Boletín y Bases Oficiales -->
+    <div class="modal-quick-actions">
+      <a href="${opo.urlOficial}" target="_blank" rel="noopener" class="btn btn-outline">
+        <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <line x1="10" y1="14" x2="21" y2="3"></line>
+        </svg>
+        <span>Acceso a la Publicación en ${boletinName}</span>
+      </a>
+      <a href="${opo.urlPdf}" target="_blank" rel="noopener" download="${opo.id}.pdf" class="btn btn-primary">
+        <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="12" y1="18" x2="12" y2="12"></line>
+          <line x1="9" y1="15" x2="12" y2="18"></line>
+          <line x1="15" y1="15" x2="12" y2="18"></line>
+        </svg>
+        <span>Bases Oficiales (PDF)</span>
+      </a>
+    </div>
+
+    <!-- Requisito: Titulación Académica -->
+    <div class="requirement-card">
+      <div class="requirement-card-header">
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+          <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+        </svg>
+        <span>Titulación Académica Mínima (${opo.categoria})</span>
+      </div>
+      <div class="requirement-card-body">
+        <p>${escapeHTML(reqs.titulacion)}</p>
+        <span class="requirement-tag">${escapeHTML(reqs.tagTitulacion)}</span>
+      </div>
+    </div>
+
+    <!-- Requisito: Requisitos Generales TREBEP -->
+    <div class="requirement-card">
+      <div class="requirement-card-header">
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span>Requisitos Generales de Acceso (TREBEP Art. 56)</span>
+      </div>
+      <div class="requirement-card-body">
+        <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px;">
+          <li><strong>Nacionalidad:</strong> Tener nacionalidad española o ser nacional de un Estado miembro de la UE (o régimen de residencia y trabajo legalmente aplicable).</li>
+          <li><strong>Edad:</strong> Tener cumplidos 16 años y no exceder de la edad legal máxima de jubilación forzosa.</li>
+          <li><strong>Capacidad funcional:</strong> Poseer la capacidad psicofísica y funcional requerida para el desempeño de las tareas del puesto.</li>
+          <li><strong>Habilitación legal:</strong> No haber sido separado mediante expediente disciplinario del servicio de las Administraciones Públicas ni hallarse inhabilitado para funciones públicas.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Requisito: Trámite y Plazo de Presentación -->
+    <div class="requirement-card">
+      <div class="requirement-card-header">
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        <span>Requisitos Específicos & Trámite de Solicitud</span>
+      </div>
+      <div class="requirement-card-body">
+        <p>${escapeHTML(reqs.especificos)}</p>
+        <p style="margin-top: 8px; font-size: 12px; color: var(--text-muted);">
+          Plazo límite oficial: <strong>${opo.plazoLimite || 'Consultar bases oficiales'}</strong>
+          ${opo.diasRestantes >= 0 ? `(Quedan ${opo.diasRestantes} días)` : '(Plazo finalizado)'}
+        </p>
+      </div>
+    </div>
+  `;
 }
 
 function renderModalHitos(container, opo) {
@@ -1631,7 +1702,27 @@ function toggleOpoNotification(id) {
   }
 }
 
+function getPruebasForOposicion(opo) {
+  const cat = (opo.categoria || '').toUpperCase();
+  const title = (opo.titulo || '').toLowerCase();
+
+  let ejercicio1 = 'Cuestionario teórico de 60 a 100 preguntas tipo test sobre el programa de materias oficiales. Las respuestas erróneas penalizan (un tercio del valor de un acierto).';
+  let ejercicio2 = 'Resolución de supuestos de carácter práctico sobre las materias del temario o ejercicio de destreza ofimática e informática (Word y Excel).';
+  let faseConcurso = 'Baremo de méritos (en fase concurso-oposición): valoración de servicios previos prestados en la Administración Pública, titulaciones académicas y formación homologada.';
+
+  if (title.includes('bomber') || title.includes('polic') || title.includes('guardia')) {
+    ejercicio1 = 'Prueba de conocimientos tipo test y batería de ejercicios psicotécnicos de aptitud intelectual.';
+    ejercicio2 = 'Pruebas físicas oficiales (velocidad, resistencia, circuito de agilidad, fuerza) y reconocimiento médico excluyente.';
+  } else if (cat === 'A1' || cat === 'A2') {
+    ejercicio1 = 'Examen tipo test o preguntas de desarrollo sobre materias comunes y de Derecho Constitucional, Administrativo y Financiero.';
+    ejercicio2 = 'Resolución por escrito y defensa oral ante el Tribunal de un caso práctico o dictamen sobre la especialidad del cuerpo.';
+  }
+
+  return { ejercicio1, ejercicio2, faseConcurso };
+}
+
 function renderModalTemario(container, opo) {
+  const pruebas = getPruebasForOposicion(opo);
   const temario = getTemarioForOposicion(opo);
   const checkedKey = `opofinder_temario_${opo.id}`;
   let checkedTopics = [];
@@ -1666,8 +1757,66 @@ function renderModalTemario(container, opo) {
   `).join('');
 
   container.innerHTML = `
-    <!-- Barra de Progreso del Estudio -->
-    <div style="background: var(--bg-subtle); padding: 14px; border-radius: 10px; margin-bottom: 16px; border: 1px solid var(--border);">
+    <!-- Botón Temporalmente Deshabilitado para Acceder al Temario -->
+    <div class="syllabus-access-box">
+      <button class="btn btn-syllabus-disabled" disabled title="Función en preparación para la próxima versión">
+        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        <span>Acceso al Temario y Test Oficiales (Próximamente)</span>
+      </button>
+      <div class="syllabus-disabled-note">
+        La descarga directa de temarios en PDF y los simuladores de test oficiales se activarán en la siguiente actualización de la versión Beta.
+      </div>
+    </div>
+
+    <!-- Estructura de Pruebas Oficiales -->
+    <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--text-main);">
+      Pruebas del Proceso Selectivo
+    </h4>
+
+    <div class="pruebas-phase-card">
+      <div class="pruebas-phase-header">
+        <svg class="icon-inline" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+        <span>Ejercicio 1: Cuestionario Teórico Tipo Test</span>
+      </div>
+      <div class="pruebas-phase-body">
+        <p>${escapeHTML(pruebas.ejercicio1)}</p>
+      </div>
+    </div>
+
+    <div class="pruebas-phase-card">
+      <div class="pruebas-phase-header">
+        <svg class="icon-inline" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="4 7 4 4 20 4 20 7"></polyline>
+          <line x1="9" y1="20" x2="15" y2="20"></line>
+          <line x1="12" y1="4" x2="12" y2="20"></line>
+        </svg>
+        <span>Ejercicio 2: Supuesto Práctico / Prueba Específica</span>
+      </div>
+      <div class="pruebas-phase-body">
+        <p>${escapeHTML(pruebas.ejercicio2)}</p>
+      </div>
+    </div>
+
+    <div class="pruebas-phase-card">
+      <div class="pruebas-phase-header">
+        <svg class="icon-inline" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        <span>Fase de Concurso: Valoración de Méritos</span>
+      </div>
+      <div class="pruebas-phase-body">
+        <p>${escapeHTML(pruebas.faseConcurso)}</p>
+      </div>
+    </div>
+
+    <!-- Progreso del Temario Oficial -->
+    <div style="background: var(--bg-subtle); padding: 14px; border-radius: 10px; margin-top: 16px; margin-bottom: 16px; border: 1px solid var(--border);">
       <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-bottom: 6px;">
         <span>Progreso de estudio:</span>
         <span>${completedTopics} de ${totalTopics} temas (${percent}%)</span>
@@ -1676,7 +1825,7 @@ function renderModalTemario(container, opo) {
         <div style="width: ${percent}%; height: 100%; background: var(--success); transition: width 0.3s ease;"></div>
       </div>
       <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
-        Marca los temas conforme vayas completando vueltas de estudio o repasos. Tu progreso se guardará automáticamente.
+        Marca los temas conforme vayas completando vueltas de estudio. El avance se conserva automáticamente.
       </p>
     </div>
 
