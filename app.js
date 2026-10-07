@@ -657,13 +657,171 @@ function calculateDeadline(dateStr) {
 }
 
 // --- 8. Filtrado y Renderizado ---
+function toggleFiltersPanel() {
+  const panel = document.getElementById('filter-panel');
+  const btn = document.getElementById('btn-toggle-filters');
+  if (!panel) return;
+
+  const isHidden = panel.style.display === 'none';
+  if (isHidden) {
+    panel.style.display = 'block';
+    if (btn) {
+      btn.classList.add('active');
+      btn.setAttribute('aria-expanded', 'true');
+    }
+  } else {
+    panel.style.display = 'none';
+    if (btn) {
+      btn.classList.remove('active');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  }
+}
+
+function updateActiveFilterBadges() {
+  const cat = document.getElementById('filter-category')?.value || 'TODAS';
+  const reg = document.getElementById('filter-region')?.value || 'TODAS';
+  const type = document.getElementById('filter-type')?.value || 'TODOS';
+  const days = document.getElementById('filter-days')?.value || '7';
+  const searchInput = document.getElementById('filter-search');
+  const search = searchInput ? searchInput.value.trim() : '';
+
+  let activeCount = 0;
+  const activeChips = [];
+
+  if (cat !== 'TODAS') {
+    activeCount++;
+    activeChips.push({ key: 'category', label: `Cat: ${cat}` });
+  }
+  if (reg !== 'TODAS') {
+    activeCount++;
+    activeChips.push({ key: 'region', label: `Ámbito: ${reg}` });
+  }
+  if (type !== 'TODOS') {
+    activeCount++;
+    activeChips.push({ key: 'type', label: type === 'Convocatoria' ? 'Convocatorias' : 'Ofertas OEP' });
+  }
+  if (days !== '7') {
+    activeCount++;
+    activeChips.push({ key: 'days', label: `${days} días` });
+  }
+  if (search) {
+    activeCount++;
+    activeChips.push({ key: 'search', label: `"${search}"` });
+  }
+
+  // Actualizar Badge en el botón de Filtros
+  const badgeEl = document.getElementById('active-filters-badge');
+  if (badgeEl) {
+    badgeEl.textContent = activeCount;
+    badgeEl.style.display = activeCount > 0 ? 'inline-block' : 'none';
+  }
+
+  // Renderizar chips de filtros activos
+  const chipsContainer = document.getElementById('active-filter-chips');
+  if (chipsContainer) {
+    if (activeChips.length > 0) {
+      chipsContainer.style.display = 'flex';
+      chipsContainer.innerHTML = activeChips.map(c => `
+        <span class="filter-chip">
+          <span>${escapeHTML(c.label)}</span>
+          <button type="button" class="filter-chip-remove" onclick="removeActiveFilter('${c.key}')" title="Quitar este filtro">&times;</button>
+        </span>
+      `).join('') + `
+        <button type="button" class="filter-chip-clear-all" onclick="resetAllFilters()">Restablecer todo</button>
+      `;
+    } else {
+      chipsContainer.style.display = 'none';
+      chipsContainer.innerHTML = '';
+    }
+  }
+}
+
+function removeActiveFilter(key) {
+  if (key === 'category') {
+    const el = document.getElementById('filter-category');
+    if (el) el.value = 'TODAS';
+  } else if (key === 'region') {
+    const el = document.getElementById('filter-region');
+    if (el) el.value = 'TODAS';
+  } else if (key === 'type') {
+    const el = document.getElementById('filter-type');
+    if (el) el.value = 'TODOS';
+  } else if (key === 'days') {
+    const el = document.getElementById('filter-days');
+    if (el) {
+      el.value = '7';
+      searchBOE();
+      return;
+    }
+  } else if (key === 'search') {
+    const el = document.getElementById('filter-search');
+    if (el) el.value = '';
+    const clearBtn = document.getElementById('clear-search-btn');
+    if (clearBtn) clearBtn.style.display = 'none';
+  }
+
+  applyFiltersAndRender();
+}
+
+function resetAllFilters() {
+  const cat = document.getElementById('filter-category');
+  const reg = document.getElementById('filter-region');
+  const type = document.getElementById('filter-type');
+  const days = document.getElementById('filter-days');
+  const search = document.getElementById('filter-search');
+  const hideExp = document.getElementById('filter-hide-expired');
+  const clearBtn = document.getElementById('clear-search-btn');
+
+  if (cat) cat.value = 'TODAS';
+  if (reg) reg.value = 'TODAS';
+  if (type) type.value = 'TODOS';
+  if (search) search.value = '';
+  if (hideExp) hideExp.checked = true;
+  if (clearBtn) clearBtn.style.display = 'none';
+
+  const needsBoeReload = days && days.value !== '7';
+  if (days) days.value = '7';
+
+  applyFiltersAndRender();
+
+  if (needsBoeReload) {
+    searchBOE();
+  }
+
+  showToast('Filtros restablecidos');
+}
+
+function clearSearchInput() {
+  const searchInput = document.getElementById('filter-search');
+  const clearBtn = document.getElementById('clear-search-btn');
+  if (searchInput) {
+    searchInput.value = '';
+    searchInput.focus();
+  }
+  if (clearBtn) {
+    clearBtn.style.display = 'none';
+  }
+  applyFiltersAndRender();
+}
+
 function applyFiltersAndRender() {
-  const selectedCat = document.getElementById('filter-category').value;
-  const selectedRegion = document.getElementById('filter-region').value;
+  const selectedCat = document.getElementById('filter-category')?.value || 'TODAS';
+  const selectedRegion = document.getElementById('filter-region')?.value || 'TODAS';
   const selectedType = document.getElementById('filter-type')?.value || 'TODOS';
-  const searchKeyword = document.getElementById('filter-search').value.toLowerCase().trim();
-  const hideExpired = document.getElementById('filter-hide-expired').checked;
+  const searchInput = document.getElementById('filter-search');
+  const searchKeyword = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  const hideExpired = document.getElementById('filter-hide-expired')?.checked ?? true;
   
+  // Mostrar u ocultar botón de limpiar búsqueda
+  const clearBtn = document.getElementById('clear-search-btn');
+  if (clearBtn) {
+    clearBtn.style.display = searchKeyword ? 'inline-block' : 'none';
+  }
+
+  // Actualizar indicadores de filtros activos
+  updateActiveFilterBadges();
+
   let filtered = state.oposiciones.filter(item => {
     // 1. Filtro por Categoría
     if (selectedCat !== 'TODAS' && item.categoria !== selectedCat) return false;
@@ -1125,7 +1283,7 @@ async function deleteFilter(id) {
 // --- 11. Service Worker & Notificaciones PWA ---
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=5').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=6').catch(err => {
       console.warn('Fallo SW:', err);
     });
   }

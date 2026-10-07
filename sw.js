@@ -1,5 +1,5 @@
-// OpoFinder - Service Worker v5 (Closed Beta, Corporate SVGs & Terminal Alerts)
-const CACHE_NAME = 'opofinder-cache-v5';
+// OpoFinder - Service Worker v6 (Collapsible Search Filters)
+const CACHE_NAME = 'opofinder-cache-v6';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

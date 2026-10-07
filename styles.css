@@ -328,6 +328,179 @@ body {
 }
 
 /* ==================== 4. FORMULARIOS & FILTROS ==================== */
+/* Barra de Búsqueda Rápida y Toggle de Filtros */
+.search-filter-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.search-input-box {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.search-box-icon {
+  position: absolute;
+  left: 12px;
+  stroke: var(--text-muted);
+  pointer-events: none;
+}
+
+.search-box-input {
+  width: 100%;
+  padding: 11px 36px 11px 38px;
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 15px;
+  color: var(--text-main);
+  background-color: var(--bg-card);
+  transition: all 0.2s ease;
+  font-family: inherit;
+  box-shadow: var(--card-shadow);
+}
+
+.search-box-input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  background-color: var(--bg-card);
+  box-shadow: 0 0 0 3px rgba(30, 58, 110, 0.2);
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.clear-search-btn:hover {
+  color: var(--text-main);
+}
+
+.btn-toggle-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 14px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  box-shadow: var(--card-shadow);
+  font-family: inherit;
+}
+
+.btn-toggle-filters:hover {
+  background-color: var(--bg-subtle);
+  border-color: var(--border-focus);
+}
+
+.btn-toggle-filters.active {
+  background-color: var(--bg-subtle);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.btn-toggle-filters.active svg {
+  stroke: var(--gold);
+}
+
+.active-filters-badge {
+  background: var(--gold);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 1px 6px;
+  line-height: 1.2;
+}
+
+.chevron-arrow {
+  transition: transform 0.25s ease;
+  stroke: currentColor;
+}
+
+.btn-toggle-filters.active .chevron-arrow {
+  transform: rotate(180deg);
+}
+
+/* Píldoras / Chips de Filtros Activos */
+.active-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 4px 10px;
+  border-radius: 14px;
+  animation: fadeInChip 0.15s ease-out;
+}
+
+@keyframes fadeInChip {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.filter-chip-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.filter-chip-remove:hover {
+  color: var(--danger);
+}
+
+.filter-chip-clear-all {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.filter-chip-clear-all:hover {
+  color: var(--danger);
+}
+
+/* Panel de Filtros Plegable */
 .filter-panel {
   background: var(--bg-card);
   border-radius: 12px;
@@ -335,6 +508,48 @@ body {
   border: 1px solid var(--border);
   box-shadow: var(--card-shadow);
   margin-bottom: 16px;
+  animation: slideDownPanel 0.2s ease-out;
+}
+
+@keyframes slideDownPanel {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.filter-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.filter-panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-hide-filters {
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.btn-hide-filters:hover {
+  color: var(--text-main);
+  background-color: var(--bg-subtle);
 }
 
 .filter-grid {
