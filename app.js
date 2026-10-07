@@ -417,6 +417,10 @@ function switchTab(tabName) {
     renderGuardadas();
   } else if (tabName === 'filtros') {
     renderFiltrosList();
+  } else if (tabName === 'biblioteca') {
+    if (typeof renderBoeBiblioteca === 'function') {
+      renderBoeBiblioteca();
+    }
   }
   
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1956,6 +1960,7 @@ function getPruebasForOposicion(opo) {
 function renderModalTemario(container, opo) {
   const pruebas = getPruebasForOposicion(opo);
   const temario = getTemarioForOposicion(opo);
+  const linkedBoeCodes = typeof getBoeCodesForOposicion === 'function' ? getBoeCodesForOposicion(opo) : [];
   const checkedKey = `opofinder_temario_${opo.id}`;
   let checkedTopics = [];
   try {
@@ -1988,20 +1993,60 @@ function renderModalTemario(container, opo) {
     </div>
   `).join('');
 
-  container.innerHTML = `
-    <!-- Botón Temporalmente Deshabilitado para Acceder al Temario -->
-    <div class="syllabus-access-box">
-      <button class="btn btn-syllabus-disabled" disabled title="Función en preparación para la próxima versión">
-        <svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-        </svg>
-        <span>Acceso al Temario y Test Oficiales (Próximamente)</span>
-      </button>
-      <div class="syllabus-disabled-note">
-        La descarga directa de temarios en PDF y los simuladores de test oficiales se activarán en la siguiente actualización de la versión Beta.
+  const boeSectionHtml = linkedBoeCodes.length > 0 ? `
+    <div class="boe-linked-syllabus-section">
+      <div class="boe-linked-header">
+        <div class="boe-linked-title-group">
+          <svg class="icon-inline" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+          <div>
+            <h4 style="font-size: 13px; font-weight: 700; color: var(--text-main); margin: 0;">
+              Documentación Oficial del BOE vinculada a este Temario
+            </h4>
+            <p style="font-size: 11px; color: var(--text-muted); margin: 0;">
+              Leyes consolidadas y códigos electrónicos requeridos en las pruebas
+            </p>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-xs" onclick="switchTab('biblioteca'); closeDetailModal();" title="Ver catálogo completo de códigos jurídicos">
+          Ver Catálogo BOE
+        </button>
+      </div>
+
+      <div class="boe-linked-cards-list">
+        ${linkedBoeCodes.map(code => {
+          const isAct = code.estado === 'actualizado';
+          return `
+            <div class="boe-linked-item">
+              <div class="boe-linked-item-header">
+                <span class="boe-apartado-tag-mini">${escapeHTML(code.apartado)}</span>
+                <span class="boe-status-badge-mini ${isAct ? 'badge-boe-actualizado' : 'badge-boe-revision'}">
+                  ${isAct ? '● Actualizado' : '▲ En revisión'}
+                </span>
+              </div>
+              <h5 class="boe-linked-item-title">${escapeHTML(code.titulo)}</h5>
+              <p class="boe-linked-item-desc">${escapeHTML(code.normasPrincipales)}</p>
+              <div class="boe-linked-item-actions">
+                <button class="btn btn-primary btn-xs" onclick="openBoeReaderModal('${code.id}')" title="Leer online">
+                  <svg class="icon-inline" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 1-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                  <span>Leer Online</span>
+                </button>
+                <a href="${code.urlPdf}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-xs" title="Descargar PDF">
+                  <svg class="icon-inline" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>Descargar PDF</span>
+                </a>
+              </div>
+            </div>
+          `;
+        }).join('')}
       </div>
     </div>
+  ` : '';
+
+  container.innerHTML = `
+    ${boeSectionHtml}
 
     <!-- Estructura de Pruebas Oficiales -->
     <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--text-main);">

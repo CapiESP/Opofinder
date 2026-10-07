@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
   
   <!-- Estilos Corporativos (Modo Claro & Oscuro) -->
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="stylesheet" href="styles.css?v=10">
   
   <!-- Supabase JS Client (v2) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -142,6 +142,30 @@
           </div>
         </div>
         
+        <!-- Navegación de Escritorio -->
+        <nav class="desktop-nav">
+          <button class="nav-item active" data-tab="buscador">
+            <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <span>Buscador</span>
+          </button>
+          <button class="nav-item" data-tab="guardadas">
+            <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+            <span>Guardadas</span>
+          </button>
+          <button class="nav-item" data-tab="biblioteca">
+            <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            <span>Temarios BOE</span>
+          </button>
+          <button class="nav-item" data-tab="filtros">
+            <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span>Avisos</span>
+          </button>
+          <button class="nav-item" data-tab="ayuda">
+            <svg class="icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <span>Guía</span>
+          </button>
+        </nav>
+
         <div class="header-right">
           <!-- Botón de Conmutador de Tema Claro / Oscuro con SVG -->
           <button id="theme-toggle" class="theme-toggle-btn" title="Alternar Modo Claro / Oscuro" onclick="toggleTheme()">
@@ -351,6 +375,74 @@
         <div id="saved-container"></div>
       </section>
 
+      <!-- ==================== PESTAÑA: BIBLIOTECA JURÍDICA BOE ==================== -->
+      <section id="tab-biblioteca" class="tab-section" style="display: none;">
+        
+        <div class="filter-panel" style="margin-bottom: 20px;">
+          <div class="biblioteca-header-row">
+            <div>
+              <h2 style="font-size: 17px; font-weight: 700; margin-bottom: 4px;">
+                Biblioteca Jurídica Oficial del Estado (BOE)
+              </h2>
+              <p style="font-size: 13px; color: var(--text-muted);">
+                Códigos electrónicos consolidados y temarios normativos oficiales para oposiciones del Estado, CCAA (BOC) y Entidades Locales.
+              </p>
+            </div>
+            <a href="https://www.boe.es/biblioteca_juridica/index.php?tipo=C" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-xs" title="Ir a la web oficial del BOE">
+              <span>boe.es oficial</span>
+              <svg class="icon-inline" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </a>
+          </div>
+
+          <!-- Barra de Búsqueda y Filtros de la Biblioteca -->
+          <div class="biblioteca-filters-grid">
+            <div class="form-group" style="flex: 2; min-width: 220px;">
+              <label for="filter-boe-search">Buscar en Códigos del BOE</label>
+              <div class="search-input-box" style="margin-bottom: 0;">
+                <svg class="search-box-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="filter-boe-search" class="search-box-input" placeholder="Buscar por ley o materia (ej: LPACAP, TREBEP, Régimen Local, Código Penal)..." oninput="handleBoeSearchInput(this.value)">
+              </div>
+            </div>
+
+            <div class="form-group" style="flex: 1.5; min-width: 180px;">
+              <label for="filter-boe-apartado">Filtrar por Apartado</label>
+              <select id="filter-boe-apartado" class="form-control" onchange="handleBoeFilterApartadoChange(this.value)">
+                <option value="Todos">Todos los apartados</option>
+                <option value="Constitución y Dcho. Constitucional">Constitución y Dcho. Constitucional</option>
+                <option value="Derecho Administrativo y Procedimiento">Derecho Administrativo y Procedimiento</option>
+                <option value="Función Pública y Empleo">Función Pública y Empleo</option>
+                <option value="Régimen Local y Autonómico">Régimen Local y Autonómico</option>
+                <option value="Hacienda y Derecho Tributario">Hacienda y Derecho Tributario</option>
+                <option value="Seguridad y Fuerzas Policiales">Seguridad y Fuerzas Policiales</option>
+                <option value="Sanidad y Servicios de Salud">Sanidad y Servicios de Salud</option>
+                <option value="Justicia y Penal / Procesal">Justicia y Penal / Procesal</option>
+                <option value="Laboral y Seguridad Social">Laboral y Seguridad Social</option>
+                <option value="Igualdad, Transparencia y Datos">Igualdad, Transparencia y Datos</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="flex: 1; min-width: 140px;">
+              <label for="filter-boe-estado">Estado BOE</label>
+              <select id="filter-boe-estado" class="form-control" onchange="handleBoeFilterEstadoChange(this.value)">
+                <option value="Todos">Todos los estados</option>
+                <option value="actualizado">Actualizado</option>
+                <option value="en revisión">En revisión</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cabecera de Resultados de la Biblioteca -->
+        <div class="results-header" style="margin-bottom: 14px;">
+          <h3 style="font-size: 15px; font-weight: 700;">Catálogo de Códigos Jurídicos</h3>
+          <span class="results-count" id="biblioteca-count-badge">Cargando biblioteca...</span>
+        </div>
+
+        <!-- Contenedor de Tarjetas de Códigos BOE -->
+        <div id="biblioteca-container"></div>
+
+      </section>
+
       <!-- ==================== PESTAÑA 3: AVISOS Y TERMINAL ==================== -->
       <section id="tab-filtros" class="tab-section" style="display: none;">
         
@@ -478,6 +570,14 @@
         <span class="nav-badge" id="saved-badge" style="display: none;">0</span>
       </button>
 
+      <button class="nav-item" data-tab="biblioteca">
+        <svg class="icon-nav" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
+        <span>Temarios</span>
+      </button>
+
       <button class="nav-item" data-tab="filtros">
         <svg class="icon-nav" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
@@ -601,9 +701,31 @@
       </div>
     </div>
 
+    <!-- ==================== 5. MODAL DE LECTURA DE CÓDIGO OFICIAL BOE ==================== -->
+    <div id="boe-reader-modal" class="modal-overlay" onclick="closeBoeReaderModal()">
+      <div class="detail-modal-card boe-reader-modal-card" onclick="event.stopPropagation()">
+        
+        <!-- Cabecera del Modal de Lectura -->
+        <div class="modal-header">
+          <div class="modal-header-info">
+            <h3 id="boe-reader-modal-title">Código Oficial del BOE</h3>
+            <p id="boe-reader-modal-subtitle">Biblioteca Jurídica Digital del Estado</p>
+          </div>
+          <button class="modal-close-btn" onclick="closeBoeReaderModal()" title="Cerrar visor">&times;</button>
+        </div>
+
+        <!-- Cuerpo del Lector -->
+        <div class="modal-body" id="boe-reader-modal-body" style="padding: 20px;">
+          <!-- Renderizado dinámico -->
+        </div>
+
+      </div>
+    </div>
+
   </div>
 
-  <!-- Script Principal -->
-  <script src="app.js?v=9"></script>
+  <!-- Scripts de la Aplicación -->
+  <script src="boe_codigos.js?v=10"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>

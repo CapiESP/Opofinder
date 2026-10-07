@@ -81,3 +81,33 @@ CREATE POLICY "Lectura de solicitudes beta para administradores"
     FOR SELECT 
     TO authenticated 
     USING (true);
+
+-- ========================================================
+-- 6. Tabla de Códigos Oficiales del BOE (Biblioteca Jurídica)
+-- ========================================================
+CREATE TABLE IF NOT EXISTS public.biblioteca_codigos (
+    id TEXT PRIMARY KEY, -- ej: 282_Procedimiento_Administrativo_Comun
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    titulo TEXT NOT NULL,
+    apartado TEXT NOT NULL,
+    estado TEXT NOT NULL DEFAULT 'actualizado', -- 'actualizado' | 'en revisión'
+    subtitulo TEXT,
+    normas_principales TEXT,
+    archivo_boe TEXT,
+    url_pdf TEXT,
+    url_web TEXT,
+    url_online TEXT,
+    url_epub TEXT,
+    tags JSONB DEFAULT '[]'::jsonb
+);
+
+ALTER TABLE public.biblioteca_codigos ENABLE ROW LEVEL SECURITY;
+
+-- Política de lectura pública de los códigos para todos los usuarios autenticados y anónimos
+DROP POLICY IF EXISTS "Lectura pública de códigos jurídicos BOE" ON public.biblioteca_codigos;
+CREATE POLICY "Lectura pública de códigos jurídicos BOE"
+    ON public.biblioteca_codigos
+    FOR SELECT
+    TO anon, authenticated
+    USING (true);
+

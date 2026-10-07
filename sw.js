@@ -1,9 +1,10 @@
-// OpoFinder - Service Worker v9 (Timeline alignment and single active step fix)
-const CACHE_NAME = 'opofinder-cache-v9';
+// OpoFinder - Service Worker v10 (Biblioteca Juridica Digital BOE y Temarios)
+const CACHE_NAME = 'opofinder-cache-v10';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './styles.css',
+  './boe_codigos.js',
   './app.js',
   './manifest.json',
   './icon-192.png',
