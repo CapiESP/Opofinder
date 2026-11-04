@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
   
   <!-- Estilos Corporativos (Modo Claro & Oscuro) -->
-  <link rel="stylesheet" href="styles.css?v=13">
+  <link rel="stylesheet" href="styles.css?v=14">
   
   <!-- Supabase JS Client (v2) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -246,6 +246,25 @@
           </button>
         </div>
 
+        <!-- Píldoras de Filtro Rápido por Estado de la Convocatoria -->
+        <div class="status-filter-pills-bar" id="status-filter-pills">
+          <button type="button" class="status-pill-btn active" data-status="TODOS" onclick="setStatusFilter('TODOS')">
+            Todos
+          </button>
+          <button type="button" class="status-pill-btn pill-abierto" data-status="abierto" onclick="setStatusFilter('abierto')">
+            <span class="status-pill-dot green"></span>
+            <span>Solicitud abierta</span>
+          </button>
+          <button type="button" class="status-pill-btn pill-pendiente" data-status="pendiente" onclick="setStatusFilter('pendiente')">
+            <span class="status-pill-dot blue"></span>
+            <span>Pendiente de publicación</span>
+          </button>
+          <button type="button" class="status-pill-btn pill-cerrado" data-status="cerrado" onclick="setStatusFilter('cerrado')">
+            <span class="status-pill-dot gray"></span>
+            <span>Plazo cerrado</span>
+          </button>
+        </div>
+
         <!-- Chips / Resumen de Filtros Activos (visibles cuando hay filtros aplicados) -->
         <div id="active-filter-chips" class="active-filter-chips" style="display: none;"></div>
 
@@ -305,6 +324,17 @@
                 <option value="Entidades Locales">Entidades Locales (Ayuntamientos)</option>
                 <option value="Universidades">Universidades</option>
                 <option value="Justicia">Justicia</option>
+              </select>
+            </div>
+
+            <!-- Filtro por Estado de la Convocatoria -->
+            <div class="form-group">
+              <label for="filter-status">Estado de la Convocatoria</label>
+              <select id="filter-status" class="form-control" onchange="syncStatusFilterFromSelect(this.value)">
+                <option value="TODOS">Todos los estados</option>
+                <option value="abierto">Solicitud abierta (inscripción activa)</option>
+                <option value="pendiente">Pendiente de publicación (OEP aprobada)</option>
+                <option value="cerrado">Plazo cerrado (finalizada)</option>
               </select>
             </div>
 
@@ -834,7 +864,7 @@
   </div>
 
   <!-- Scripts de la Aplicación -->
-  <script src="boe_codigos.js?v=13"></script>
-  <script src="app.js?v=13"></script>
+  <script src="boe_codigos.js?v=14"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>

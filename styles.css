@@ -574,6 +574,75 @@ body {
   color: var(--gold);
 }
 
+/* Barra de Píldoras de Filtro Rápido por Estado en Buscador */
+.status-filter-pills-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 10px 2px;
+  margin-bottom: 6px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.status-filter-pills-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.status-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.status-pill-btn:hover {
+  background: var(--bg-subtle);
+  color: var(--text-main);
+  border-color: var(--border-focus);
+}
+
+.status-pill-btn.active {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+}
+
+.status-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-pill-dot.green {
+  background-color: #10b981;
+}
+
+.status-pill-dot.blue {
+  background-color: #3b82f6;
+}
+
+.status-pill-dot.gray {
+  background-color: #94a3b8;
+}
+
+.status-pill-btn.active .status-pill-dot {
+  background-color: #ffffff;
+}
+
 .btn-toggle-filters.active svg {
   stroke: var(--gold);
 }
@@ -1213,6 +1282,30 @@ body {
   background-color: var(--bg-subtle);
   color: var(--text-muted);
   border: 1px solid var(--border);
+}
+
+/* Píldoras de Estado de Convocatoria en Tarjetas */
+.badge-status-abierto {
+  background-color: var(--success-bg);
+  color: var(--success);
+  border: 1px solid rgba(21, 128, 61, 0.3);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.badge-status-pendiente {
+  background-color: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.badge-status-cerrado {
+  background-color: var(--bg-subtle);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-weight: 600;
 }
 
 .btn-bookmark {

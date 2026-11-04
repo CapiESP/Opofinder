@@ -1,5 +1,5 @@
-// OpoFinder - Service Worker v13 (Instant Alert Modal & Live Phase Deadline Fix)
-const CACHE_NAME = 'opofinder-cache-v13';
+// OpoFinder - Service Worker v14 (Status Badges on Cards & State Filtering)
+const CACHE_NAME = 'opofinder-cache-v14';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

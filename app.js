@@ -1326,6 +1326,39 @@ function toggleFiltersPanel() {
   }
 }
 
+// Filtro rápido por estado procedimental ('TODOS', 'abierto', 'pendiente', 'cerrado')
+let currentStatusFilter = 'TODOS';
+
+function setStatusFilter(status, shouldRender = true) {
+  currentStatusFilter = status || 'TODOS';
+
+  // Sincronizar botones de píldora rápida en el buscador
+  const pillBtns = document.querySelectorAll('.status-pill-btn');
+  pillBtns.forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-status') === currentStatusFilter);
+  });
+
+  // Sincronizar select en panel de filtros avanzados
+  const statusSelect = document.getElementById('filter-status');
+  if (statusSelect && statusSelect.value !== currentStatusFilter) {
+    statusSelect.value = currentStatusFilter;
+  }
+
+  // Si el usuario filtra por "Plazo cerrado", desmarcamos el checkbox de ocultar caducadas
+  const hideExp = document.getElementById('filter-hide-expired');
+  if (currentStatusFilter === 'cerrado' && hideExp && hideExp.checked) {
+    hideExp.checked = false;
+  }
+
+  if (shouldRender) {
+    applyFiltersAndRender();
+  }
+}
+
+function syncStatusFilterFromSelect(status) {
+  setStatusFilter(status, true);
+}
+
 function updateActiveFilterBadges() {
   const cat = document.getElementById('filter-category')?.value || 'TODAS';
   const reg = document.getElementById('filter-region')?.value || 'TODAS';
@@ -1356,6 +1389,15 @@ function updateActiveFilterBadges() {
   if (search) {
     activeCount++;
     activeChips.push({ key: 'search', label: `"${search}"` });
+  }
+  if (currentStatusFilter !== 'TODOS') {
+    activeCount++;
+    const labelMap = {
+      'abierto': 'Estado: Solicitud abierta',
+      'pendiente': 'Estado: Pendiente de publicación',
+      'cerrado': 'Estado: Plazo cerrado'
+    };
+    activeChips.push({ key: 'status', label: labelMap[currentStatusFilter] || `Estado: ${currentStatusFilter}` });
   }
 
   // Actualizar Badge en el botón de Filtros
@@ -1395,6 +1437,9 @@ function removeActiveFilter(key) {
   } else if (key === 'type') {
     const el = document.getElementById('filter-type');
     if (el) el.value = 'TODOS';
+  } else if (key === 'status') {
+    setStatusFilter('TODOS');
+    return;
   } else if (key === 'days') {
     const el = document.getElementById('filter-days');
     if (el) {
@@ -1427,6 +1472,8 @@ function resetAllFilters() {
   if (search) search.value = '';
   if (hideExp) hideExp.checked = true;
   if (clearBtn) clearBtn.style.display = 'none';
+
+  setStatusFilter('TODOS', false);
 
   const needsBoeReload = days && days.value !== '7';
   if (days) days.value = '7';
@@ -1471,23 +1518,36 @@ function applyFiltersAndRender() {
   updateActiveFilterBadges();
 
   let filtered = state.oposiciones.filter(item => {
+    const opo = recalculateOpoDeadline(item);
+
     // 1. Filtro por Categoría
-    if (selectedCat !== 'TODAS' && item.categoria !== selectedCat) return false;
+    if (selectedCat !== 'TODAS' && (opo.categoria || '').toUpperCase() !== selectedCat.toUpperCase()) return false;
     
     // 2. Filtro por Región
-    if (selectedRegion !== 'TODAS' && item.region !== selectedRegion) return false;
+    if (selectedRegion !== 'TODAS' && opo.region !== selectedRegion) return false;
     
     // 3. Filtro por Tipo de Proceso (Convocatoria vs Oferta OEP)
-    if (selectedType !== 'TODOS' && item.tipo !== selectedType) return false;
+    if (selectedType !== 'TODOS' && opo.tipo !== selectedType) return false;
+
+    // 4. Filtro por Estado de la Convocatoria
+    if (currentStatusFilter === 'abierto') {
+      if (opo.estadoPlazo !== 'abierto') return false;
+    } else if (currentStatusFilter === 'pendiente') {
+      if (opo.estadoPlazo !== 'oep' && opo.tipo !== 'Oferta OEP') return false;
+    } else if (currentStatusFilter === 'cerrado') {
+      if (opo.estadoPlazo !== 'cerrado' && opo.diasRestantes >= 0) return false;
+    }
     
-    // 4. Filtro por Palabra Clave
+    // 5. Filtro por Palabra Clave
     if (searchKeyword) {
-      const matchText = `${item.titulo} ${item.organismo}`.toLowerCase();
+      const matchText = `${opo.titulo} ${opo.organismo}`.toLowerCase();
       if (!matchText.includes(searchKeyword)) return false;
     }
     
-    // 5. Omitir caducadas (solo aplica si es Convocatoria cerrada)
-    if (hideExpired && item.tipo === 'Convocatoria' && item.diasRestantes < 0) return false;
+    // 6. Omitir caducadas (si hideExpired está activo y no se ha pedido explícitamente ver cerradas)
+    if (currentStatusFilter !== 'cerrado' && hideExpired && opo.tipo === 'Convocatoria' && (opo.diasRestantes < 0 || opo.estadoPlazo === 'cerrado')) {
+      return false;
+    }
     
     return true;
   });
@@ -1526,14 +1586,26 @@ function createCardHTML(item) {
   const isSaved = state.guardadas.some(g => g.id === item.id);
   const plazasCount = item.plazas || 1;
   const plazasText = `${plazasCount} ${plazasCount === 1 ? 'plaza' : 'plazas'}`;
+  const opo = recalculateOpoDeadline(item);
+
+  let statusBadgeHtml = '';
+  if (opo.estadoPlazo === 'abierto') {
+    const daysText = opo.diasRestantes > 0 ? ` (${opo.diasRestantes}d)` : '';
+    statusBadgeHtml = `<span class="badge badge-status-abierto" title="Plazo vigente para presentar instancias">● Solicitud abierta${daysText}</span>`;
+  } else if (opo.estadoPlazo === 'oep' || opo.tipo === 'Oferta OEP') {
+    statusBadgeHtml = `<span class="badge badge-status-pendiente" title="Oferta OEP aprobada, bases pendientes de publicación">⏳ Pendiente de publicación</span>`;
+  } else {
+    statusBadgeHtml = `<span class="badge badge-status-cerrado" title="Plazo de solicitudes concluido">✕ Plazo cerrado</span>`;
+  }
 
   return `
     <div class="opo-card ${isSaved ? 'saved-highlight' : ''}" id="card-${item.id}" onclick="openDetailModal('${item.id}')">
       <div class="card-summary-header">
         <div class="badges-row">
-          <span class="badge badge-${item.categoria.toLowerCase()}">${item.categoria}</span>
-          <span class="badge badge-region">${escapeHTML(item.region)}</span>
+          <span class="badge badge-${(item.categoria || 'otra').toLowerCase()}">${escapeHTML(item.categoria || 'OTRA')}</span>
+          <span class="badge badge-region">${escapeHTML(item.region || 'Estatal')}</span>
           <span class="badge badge-plazas">${plazasText}</span>
+          ${statusBadgeHtml}
         </div>
         <button class="btn-bookmark ${isSaved ? 'active' : ''}" onclick="event.stopPropagation(); toggleBookmark('${item.id}')" title="${isSaved ? 'Quitar de guardadas' : 'Guardar oposición'}">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="${isSaved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1969,6 +2041,16 @@ function renderActiveAlerts() {
       const plazasCount = item.plazas || 1;
       const plazasText = `${plazasCount} ${plazasCount === 1 ? 'plaza' : 'plazas'}`;
 
+      let statusBadgeHtml = '';
+      if (item.estadoPlazo === 'abierto') {
+        const daysText = item.diasRestantes > 0 ? ` (${item.diasRestantes}d)` : '';
+        statusBadgeHtml = `<span class="badge badge-status-abierto" title="Plazo vigente para presentar instancias">● Solicitud abierta${daysText}</span>`;
+      } else if (item.estadoPlazo === 'oep' || item.tipo === 'Oferta OEP') {
+        statusBadgeHtml = `<span class="badge badge-status-pendiente" title="Oferta OEP aprobada, bases pendientes de publicación">⏳ Pendiente de publicación</span>`;
+      } else {
+        statusBadgeHtml = `<span class="badge badge-status-cerrado" title="Plazo de solicitudes concluido">✕ Plazo cerrado</span>`;
+      }
+
       return `
         <div class="opo-card alert-card ${a.isViewed ? 'alert-viewed' : 'alert-unread'}" id="alert-card-${item.id}" onclick="openAlertDetailFromCard('${item.id}')">
           <div class="card-summary-header">
@@ -1979,7 +2061,7 @@ function renderActiveAlerts() {
               <span class="badge badge-${(item.categoria || 'otra').toLowerCase()}">${escapeHTML(item.categoria || 'OTRA')}</span>
               <span class="badge badge-region">${escapeHTML(item.region || 'Estatal')}</span>
               <span class="badge badge-plazas">${plazasText}</span>
-              ${item.estadoPlazo === 'cerrado' ? '<span class="badge" style="background: var(--danger-bg); color: var(--danger); font-size: 10px; font-weight: 700;">Plazo cerrado</span>' : ''}
+              ${statusBadgeHtml}
             </div>
             <span class="alert-matched-filter" title="Criterio de alerta coincidente">
               Alerta: <strong>${escapeHTML(a.filters.join(', '))}</strong>
@@ -2114,7 +2196,7 @@ async function deleteFilter(id) {
 // --- 11. Service Worker & Notificaciones PWA ---
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=13').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=14').catch(err => {
       console.warn('Fallo SW:', err);
     });
   }
