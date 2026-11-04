@@ -1,5 +1,5 @@
-// OpoFinder - Service Worker v12 (12h Auto-Sync, Witness Badge & Minimalist UI)
-const CACHE_NAME = 'opofinder-cache-v12';
+// OpoFinder - Service Worker v13 (Instant Alert Modal & Live Phase Deadline Fix)
+const CACHE_NAME = 'opofinder-cache-v13';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

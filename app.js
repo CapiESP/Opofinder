@@ -592,8 +592,8 @@ const CCAA_PRELOADED_DATA = [
     fechaPublicacion: '01/10/2026',
     fechaRaw: '20261001',
     plazoLimite: '21/10/2026',
-    diasRestantes: 15,
-    estadoPlazo: 'abierto',
+    diasRestantes: -14,
+    estadoPlazo: 'cerrado',
     urlOficial: 'https://boc.cantabria.es',
     urlPdf: 'https://aplicacionesweb.cantabria.es/opecan/'
   },
@@ -609,8 +609,8 @@ const CCAA_PRELOADED_DATA = [
     fechaPublicacion: '01/10/2026',
     fechaRaw: '20261001',
     plazoLimite: '21/10/2026',
-    diasRestantes: 15,
-    estadoPlazo: 'abierto',
+    diasRestantes: -14,
+    estadoPlazo: 'cerrado',
     urlOficial: 'https://boc.cantabria.es',
     urlPdf: 'https://aplicacionesweb.cantabria.es/opecan/'
   },
@@ -626,8 +626,8 @@ const CCAA_PRELOADED_DATA = [
     fechaPublicacion: '28/09/2026',
     fechaRaw: '20260928',
     plazoLimite: '18/10/2026',
-    diasRestantes: 12,
-    estadoPlazo: 'abierto',
+    diasRestantes: -17,
+    estadoPlazo: 'cerrado',
     urlOficial: 'https://boc.cantabria.es',
     urlPdf: 'https://boc.cantabria.es'
   },
@@ -789,23 +789,72 @@ const CCAA_PRELOADED_DATA = [
 // --- 6. Sincronización Conjunta (BOE + Boletines Autonómicos y OEPs) ---
 
 /**
- * Recalcula dinámicamente los plazos de vencimiento y días hábiles
- * respecto a la fecha actual para que la información esté viva y precisa.
+ * Recalcula dinámicamente los plazos de vencimiento, días restantes y estado de plazo
+ * para CUALQUIER convocatoria (BOE, BOC, autonómicas o guardadas) con respecto a la fecha actual.
  */
+function recalculateOpoDeadline(item) {
+  if (!item) return item;
+
+  const isOep = item.tipo === 'Oferta OEP' || (item.plazoLimite && item.plazoLimite.toLowerCase().includes('pendiente'));
+  if (isOep) {
+    return {
+      ...item,
+      tipo: item.tipo || 'Oferta OEP',
+      estadoPlazo: 'oep',
+      diasRestantes: 999,
+      plazoLimite: item.plazoLimite || 'Pendiente de convocatoria'
+    };
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // 1. Si el plazo límite viene explicitado con formato de fecha DD/MM/YYYY
+  if (item.plazoLimite && item.plazoLimite.includes('/')) {
+    const parts = item.plazoLimite.trim().split('/');
+    if (parts.length === 3) {
+      const d = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const y = parseInt(parts[2], 10);
+      if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+        const deadlineDate = new Date(y, m, d, 23, 59, 59);
+        const diffMs = deadlineDate.getTime() - today.getTime();
+        const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        const isClosed = daysLeft < 0;
+
+        return {
+          ...item,
+          plazoLimite: item.plazoLimite,
+          diasRestantes: daysLeft,
+          estadoPlazo: isClosed ? 'cerrado' : 'abierto'
+        };
+      }
+    }
+  }
+
+  // 2. Si tiene fechaRaw (YYYYMMDD) o fechaPublicacion (DD/MM/YYYY)
+  let rawDate = item.fechaRaw;
+  if (!rawDate && item.fechaPublicacion && item.fechaPublicacion.includes('/')) {
+    const p = item.fechaPublicacion.split('/');
+    if (p.length === 3) rawDate = `${p[2]}${p[1].padStart(2, '0')}${p[0].padStart(2, '0')}`;
+  }
+
+  if (rawDate && rawDate.length === 8) {
+    const dInfo = calculateDeadline(rawDate);
+    return {
+      ...item,
+      plazoLimite: dInfo.formattedDate,
+      diasRestantes: dInfo.daysLeft,
+      estadoPlazo: dInfo.status
+    };
+  }
+
+  return item;
+}
+
 function refreshDeadlinesForList(list) {
   if (!Array.isArray(list)) return [];
-  return list.map(item => {
-    if (item.fechaRaw && item.boletin === 'BOE') {
-      const dInfo = calculateDeadline(item.fechaRaw);
-      return {
-        ...item,
-        plazoLimite: dInfo.formattedDate,
-        diasRestantes: dInfo.daysLeft,
-        estadoPlazo: dInfo.status
-      };
-    }
-    return item;
-  });
+  return list.map(item => recalculateOpoDeadline(item));
 }
 
 /**
@@ -1621,7 +1670,12 @@ async function loadSavedOposiciones() {
 
   const local = localStorage.getItem(`opofinder_saved_${currentUser.id}`);
   if (local) {
-    try { state.guardadas = JSON.parse(local); } catch(e){}
+    try {
+      const parsed = JSON.parse(local);
+      if (Array.isArray(parsed)) {
+        state.guardadas = parsed.map(d => recalculateOpoDeadline(d));
+      }
+    } catch(e){}
   }
   
   if (supabaseClient && currentUser) {
@@ -1632,7 +1686,7 @@ async function loadSavedOposiciones() {
         .eq('user_id', currentUser.id);
 
       if (!error && data) {
-        state.guardadas = data.map(d => ({
+        state.guardadas = data.map(d => recalculateOpoDeadline({
           id: d.id,
           titulo: d.titulo,
           organismo: d.organismo,
@@ -1640,8 +1694,6 @@ async function loadSavedOposiciones() {
           region: d.region,
           fechaPublicacion: d.fecha_convocatoria,
           plazoLimite: d.plazo_limite,
-          diasRestantes: 15,
-          estadoPlazo: 'abierto',
           urlPdf: d.url_pdf,
           urlOficial: d.url_oficial
         }));
@@ -1760,6 +1812,7 @@ function updateAlertBadges(count) {
   const mobileBadge = document.getElementById('filters-badge');
   const desktopBadge = document.getElementById('desktop-filters-badge');
   const unreadCounterBadge = document.getElementById('unread-alerts-counter-badge');
+  const modalCounterBadge = document.getElementById('alerts-modal-counter-badge');
   const alertBanner = document.getElementById('alert-banner');
   const bannerText = document.getElementById('alert-banner-text');
 
@@ -1773,18 +1826,23 @@ function updateAlertBadges(count) {
     desktopBadge.style.display = count > 0 ? 'inline-block' : 'none';
   }
 
+  const badgeText = count > 0 ? `${count} ${count === 1 ? 'pendiente' : 'pendientes'}` : 'Al día (0)';
+  const badgeBg = count > 0 ? 'var(--danger-bg)' : 'var(--success-bg)';
+  const badgeColor = count > 0 ? 'var(--danger)' : 'var(--success)';
+  const badgeBorder = count > 0 ? 'rgba(220, 38, 38, 0.3)' : 'rgba(21, 128, 61, 0.3)';
+
   if (unreadCounterBadge) {
-    if (count > 0) {
-      unreadCounterBadge.textContent = `${count} ${count === 1 ? 'pendiente' : 'pendientes'}`;
-      unreadCounterBadge.style.background = 'var(--danger-bg)';
-      unreadCounterBadge.style.color = 'var(--danger)';
-      unreadCounterBadge.style.borderColor = 'rgba(220, 38, 38, 0.3)';
-    } else {
-      unreadCounterBadge.textContent = 'Al día (0)';
-      unreadCounterBadge.style.background = 'var(--success-bg)';
-      unreadCounterBadge.style.color = 'var(--success)';
-      unreadCounterBadge.style.borderColor = 'rgba(21, 128, 61, 0.3)';
-    }
+    unreadCounterBadge.textContent = badgeText;
+    unreadCounterBadge.style.background = badgeBg;
+    unreadCounterBadge.style.color = badgeColor;
+    unreadCounterBadge.style.borderColor = badgeBorder;
+  }
+
+  if (modalCounterBadge) {
+    modalCounterBadge.textContent = badgeText;
+    modalCounterBadge.style.background = badgeBg;
+    modalCounterBadge.style.color = badgeColor;
+    modalCounterBadge.style.borderColor = badgeBorder;
   }
 
   if (alertBanner) {
@@ -1824,7 +1882,7 @@ function checkFilterAlerts() {
       const filterLabel = filter.nombre || `${filter.categoria} en ${filter.region}`;
       if (!matchesMap.has(match.id)) {
         matchesMap.set(match.id, {
-          opo: match,
+          opo: recalculateOpoDeadline(match),
           filters: [filterLabel],
           isViewed: viewedIds.includes(match.id)
         });
@@ -1851,14 +1909,17 @@ function switchAlertFilterTab(tabName) {
   state.currentAlertFilterTab = tabName;
   ['pendientes', 'todas', 'visionadas'].forEach(t => {
     const btn = document.getElementById(`filter-alert-tab-${t}`);
+    const modalBtn = document.getElementById(`modal-alert-tab-${t}`);
     if (btn) btn.classList.toggle('active', t === tabName);
+    if (modalBtn) modalBtn.classList.toggle('active', t === tabName);
   });
   renderActiveAlerts();
 }
 
 function renderActiveAlerts() {
   const container = document.getElementById('active-alerts-list');
-  if (!container) return;
+  const modalContainer = document.getElementById('modal-alerts-list');
+  if (!container && !modalContainer) return;
 
   const alerts = state.alertMatches || [];
   const currentFilter = state.currentAlertFilterTab || 'pendientes';
@@ -1870,8 +1931,9 @@ function renderActiveAlerts() {
     filteredAlerts = alerts.filter(a => a.isViewed);
   }
 
+  let html = '';
   if (alerts.length === 0) {
-    container.innerHTML = `
+    html = `
       <div class="empty-state" style="padding: 24px 16px;">
         <svg class="icon-inline" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); margin-bottom: 6px;">
           <circle cx="12" cy="12" r="10"></circle>
@@ -1884,15 +1946,12 @@ function renderActiveAlerts() {
         </p>
       </div>
     `;
-    return;
-  }
-
-  if (filteredAlerts.length === 0) {
+  } else if (filteredAlerts.length === 0) {
     const message = currentFilter === 'pendientes'
       ? '¡Todo al día! Has visionado todas las convocatorias detectadas por tus alertas.'
       : 'No hay convocatorias visionadas aún en esta sección.';
 
-    container.innerHTML = `
+    html = `
       <div class="empty-state" style="padding: 24px 16px;">
         <svg class="icon-inline" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--success); margin-bottom: 6px;">
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
@@ -1900,64 +1959,90 @@ function renderActiveAlerts() {
         </svg>
         <h4 style="font-size: 14px; font-weight: 700; color: var(--text-main); margin: 0;">${message}</h4>
         <p style="color: var(--text-muted); font-size: 12px; margin-top: 4px;">
-          Puedes pulsar en "Todas las detectadas" para consultar el histórico de avisos recibidos.
+          Puedes pulsar en "Todas" para consultar el histórico de avisos recibidos.
         </p>
       </div>
     `;
-    return;
+  } else {
+    html = filteredAlerts.map(a => {
+      const item = recalculateOpoDeadline(a.opo);
+      const plazasCount = item.plazas || 1;
+      const plazasText = `${plazasCount} ${plazasCount === 1 ? 'plaza' : 'plazas'}`;
+
+      return `
+        <div class="opo-card alert-card ${a.isViewed ? 'alert-viewed' : 'alert-unread'}" id="alert-card-${item.id}" onclick="openAlertDetailFromCard('${item.id}')">
+          <div class="card-summary-header">
+            <div class="badges-row">
+              <span class="badge ${a.isViewed ? 'badge-viewed' : 'badge-unread'}">
+                ${a.isViewed ? '✓ Visionada' : '● Nuevo aviso'}
+              </span>
+              <span class="badge badge-${(item.categoria || 'otra').toLowerCase()}">${escapeHTML(item.categoria || 'OTRA')}</span>
+              <span class="badge badge-region">${escapeHTML(item.region || 'Estatal')}</span>
+              <span class="badge badge-plazas">${plazasText}</span>
+              ${item.estadoPlazo === 'cerrado' ? '<span class="badge" style="background: var(--danger-bg); color: var(--danger); font-size: 10px; font-weight: 700;">Plazo cerrado</span>' : ''}
+            </div>
+            <span class="alert-matched-filter" title="Criterio de alerta coincidente">
+              Alerta: <strong>${escapeHTML(a.filters.join(', '))}</strong>
+            </span>
+          </div>
+
+          <div class="card-summary-title">
+            ${escapeHTML(item.titulo)}
+          </div>
+
+          <div class="card-summary-footer">
+            <span class="card-summary-org">${escapeHTML(item.organismo)}</span>
+            <div style="display: flex; gap: 6px; align-items: center;" onclick="event.stopPropagation()">
+              ${!a.isViewed ? `
+                <button type="button" class="btn btn-outline btn-sm" onclick="markAlertAsViewed('${item.id}')" title="Marcar como vista y descontar del número de avisos">
+                  Marcar como vista
+                </button>
+              ` : ''}
+              <button type="button" class="btn btn-primary btn-sm" onclick="openAlertDetailFromCard('${item.id}')">
+                Ver convocatoria
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 
-  container.innerHTML = filteredAlerts.map(a => {
-    const item = a.opo;
-    const plazasCount = item.plazas || 1;
-    const plazasText = `${plazasCount} ${plazasCount === 1 ? 'plaza' : 'plazas'}`;
+  if (container) container.innerHTML = html;
+  if (modalContainer) modalContainer.innerHTML = html;
+}
 
-    return `
-      <div class="opo-card alert-card ${a.isViewed ? 'alert-viewed' : 'alert-unread'}" id="alert-card-${item.id}" onclick="openDetailModal('${item.id}')">
-        <div class="card-summary-header">
-          <div class="badges-row">
-            <span class="badge ${a.isViewed ? 'badge-viewed' : 'badge-unread'}">
-              ${a.isViewed ? '✓ Visionada' : '● Nuevo aviso'}
-            </span>
-            <span class="badge badge-${(item.categoria || 'otra').toLowerCase()}">${escapeHTML(item.categoria || 'OTRA')}</span>
-            <span class="badge badge-region">${escapeHTML(item.region || 'Estatal')}</span>
-            <span class="badge badge-plazas">${plazasText}</span>
-          </div>
-          <span class="alert-matched-filter" title="Criterio de alerta coincidente">
-            Alerta: <strong>${escapeHTML(a.filters.join(', '))}</strong>
-          </span>
-        </div>
+function openAlertDetailFromCard(id) {
+  closeAlertsModal();
+  openDetailModal(id);
+}
 
-        <div class="card-summary-title">
-          ${escapeHTML(item.titulo)}
-        </div>
+function openAlertsModal() {
+  const modal = document.getElementById('alerts-modal');
+  if (modal) {
+    renderActiveAlerts();
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+}
 
-        <div class="card-summary-footer">
-          <span class="card-summary-org">${escapeHTML(item.organismo)}</span>
-          <div style="display: flex; gap: 6px; align-items: center;" onclick="event.stopPropagation()">
-            ${!a.isViewed ? `
-              <button type="button" class="btn btn-outline btn-sm" onclick="markAlertAsViewed('${item.id}')" title="Marcar como vista y descontar del número de avisos">
-                Marcar como vista
-              </button>
-            ` : ''}
-            <button type="button" class="btn btn-primary btn-sm" onclick="openDetailModal('${item.id}')">
-              Ver convocatoria
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-  }).join('');
+function closeAlertsModal() {
+  const modal = document.getElementById('alerts-modal');
+  if (modal) {
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+}
+
+function handleAlertsModalOverlayClick(e) {
+  if (e.target && e.target.id === 'alerts-modal') {
+    closeAlertsModal();
+  }
 }
 
 function handleViewAlertsBannerClick() {
+  openAlertsModal();
   switchTab('filtros');
-  setTimeout(() => {
-    const el = document.getElementById('active-alerts-panel');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, 100);
 }
 
 function renderFiltrosList() {
@@ -2029,7 +2114,7 @@ async function deleteFilter(id) {
 // --- 11. Service Worker & Notificaciones PWA ---
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=12').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=13').catch(err => {
       console.warn('Fallo SW:', err);
     });
   }
@@ -2063,6 +2148,15 @@ function setupEventListeners() {
   document.getElementById('filter-days').addEventListener('change', () => searchBOE({ force: false, silent: false }));
   document.getElementById('btn-save-filter').addEventListener('click', saveCurrentFilter);
   document.getElementById('btn-refresh-boe').addEventListener('click', () => searchBOE({ force: true, silent: false }));
+
+  const viewAlertsBtn = document.getElementById('btn-view-alerts');
+  if (viewAlertsBtn) {
+    viewAlertsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleViewAlertsBannerClick();
+    });
+  }
   
   const closeIos = document.getElementById('close-ios-banner');
   if (closeIos) {
@@ -2186,8 +2280,10 @@ function applyTheme(theme) {
 
 // --- 14. Modal de Detalle, Requerimientos, Temario & Hitos ---
 function openDetailModal(id) {
-  const opo = state.oposiciones.find(o => o.id === id) || state.guardadas.find(g => g.id === id);
+  let opo = state.oposiciones.find(o => o.id === id) || state.guardadas.find(g => g.id === id);
   if (!opo) return;
+
+  opo = recalculateOpoDeadline(opo);
 
   // Al visionar la convocatoria, se resta automáticamente del número de avisos pendientes
   markAlertAsViewed(id);
@@ -2381,11 +2477,11 @@ function renderModalRequerimientos(container, opo) {
 function renderModalHitos(container, opo) {
   const notifKey = `opofinder_notif_${opo.id}`;
   const isNotifActive = localStorage.getItem(notifKey) === 'true';
-  const isOep = opo.tipo === 'Oferta OEP';
-  const isCerrado = !isOep && opo.diasRestantes < 0;
+  const isOep = opo.tipo === 'Oferta OEP' || (opo.plazoLimite && opo.plazoLimite.toLowerCase().includes('pendiente'));
+  const isCerrado = !isOep && (opo.diasRestantes < 0 || opo.estadoPlazo === 'cerrado');
 
-  // Determinar dinámicamente cuál es la fase activa (solo una activa en color oro)
-  let currentStep = 3; // Por defecto en convocatorias: Plazo de Solicitudes Abierto
+  // Determinar dinámicamente cuál es la fase activa
+  let currentStep = 3; // Por defecto en convocatorias abiertas: Plazo de Solicitudes Abierto
   if (isOep) {
     currentStep = 2; // OEP aprobada, pendiente de publicación de Bases y Convocatoria
   } else if (isCerrado) {
@@ -2409,7 +2505,7 @@ function renderModalHitos(container, opo) {
         <span style="font-size: 13px; font-weight: 700; color: var(--text-main);">
           ${isOep ? 'Oferta de Empleo Público (OEP)' : 'Convocatoria Oficial Publicada'}
         </span>
-        <span class="badge ${isOep ? 'badge-oep' : 'badge-convocatoria'}">
+        <span class="badge ${isOep ? 'badge-oep' : (isCerrado ? '' : 'badge-convocatoria')}" style="${isCerrado ? 'background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(220, 38, 38, 0.3); font-weight: 700;' : ''}">
           ${isOep ? 'OEP Aprobada' : (isCerrado ? 'Plazo Cerrado' : `Plazo Abierto (${opo.diasRestantes} días)`)}
         </span>
       </div>
@@ -2427,7 +2523,7 @@ function renderModalHitos(container, opo) {
     <div class="lifecycle-timeline">
       <!-- Paso 1 -->
       <div class="timeline-step ${getStepClass(1)}">
-        <div class="timeline-dot">1</div>
+        <div class="timeline-dot">${currentStep > 1 ? '✓' : '1'}</div>
         <div class="timeline-content">
           <h4>1. Publicación de la OEP</h4>
           <p>Aprobada en Consejo de Gobierno / Pleno Municipal.</p>
@@ -2436,7 +2532,7 @@ function renderModalHitos(container, opo) {
 
       <!-- Paso 2 -->
       <div class="timeline-step ${getStepClass(2)}">
-        <div class="timeline-dot">2</div>
+        <div class="timeline-dot">${currentStep > 2 ? '✓' : '2'}</div>
         <div class="timeline-content">
           <h4>2. Publicación de Bases y Convocatoria</h4>
           <p>${isOep ? 'Pendiente de publicación en boletín oficial.' : `Publicado en ${opo.boletin || 'BOE'} (${opo.fechaPublicacion}).`}</p>
@@ -2445,15 +2541,21 @@ function renderModalHitos(container, opo) {
 
       <!-- Paso 3 -->
       <div class="timeline-step ${getStepClass(3)}">
-        <div class="timeline-dot">3</div>
+        <div class="timeline-dot">${isCerrado ? '✓' : '3'}</div>
         <div class="timeline-content">
           <h4>3. Plazo de Presentación de Solicitudes</h4>
-          <p>${isOep ? 'Se abrirá tras la publicación oficial.' : (isCerrado ? `Finalizado el ${opo.plazoLimite}` : `Abierto hasta el ${opo.plazoLimite} (quedan ${opo.diasRestantes} días)`)}</p>
+          <p>${isOep ? 'Se abrirá tras la publicación oficial.' : (isCerrado ? `<strong>Plazo finalizado el ${opo.plazoLimite}</strong>` : `Abierto hasta el ${opo.plazoLimite} (quedan ${opo.diasRestantes} días)`)}</p>
         </div>
       </div>
 
       <!-- Paso 4 -->
       <div class="timeline-step ${getStepClass(4)}">
+        <div class="timeline-dot">4</div>
+        <div class="timeline-content">
+          <h4>4. Listas Provisionales de Admitidos y Excluidos</h4>
+          <p>${isCerrado ? '<strong>Fase actual en curso:</strong> Finalizado el plazo de instancias en octubre, el tribunal tramita la relación provisional de admitidos/excluidos y el plazo de subsanaciones.' : 'Publicación de relaciones provisionales y plazo de 10 días para subsanación.'}</p>
+        </div>
+      </div>
         <div class="timeline-dot">4</div>
         <div class="timeline-content">
           <h4>4. Listas Provisionales de Admitidos y Excluidos</h4>
