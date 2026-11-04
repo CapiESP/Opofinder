@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
   
   <!-- Estilos Corporativos (Modo Claro & Oscuro) -->
-  <link rel="stylesheet" href="styles.css?v=11">
+  <link rel="stylesheet" href="styles.css?v=12">
   
   <!-- Supabase JS Client (v2) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -356,10 +356,28 @@
           </div>
         </div>
 
-        <!-- Cabecera de Resultados -->
+        <!-- Cabecera de Resultados con Testigo de Sincronización y Botón de Forzado -->
         <div class="results-header">
-          <h2 style="font-size: 15px; font-weight: 700;">Convocatorias Oficiales</h2>
-          <span class="results-count" id="results-count">Cargando convocatorias...</span>
+          <div class="results-header-info">
+            <h2 style="font-size: 15px; font-weight: 700; margin: 0;">Convocatorias Oficiales</h2>
+            <span class="results-count" id="results-count">Cargando convocatorias...</span>
+          </div>
+
+          <div class="sync-status-toolbar">
+            <div id="sync-witness-badge" class="sync-witness-badge" title="Estado de sincronización oficial. Se actualiza automáticamente cada 12 horas.">
+              <span class="sync-dot live" id="sync-status-dot"></span>
+              <span id="sync-witness-text" class="sync-witness-text">Comprobando actualización...</span>
+            </div>
+
+            <button type="button" id="btn-force-sync" class="btn-force-sync" onclick="forceManualUpdate()" title="Forzar actualización inmediata del BOE y CCAA" aria-label="Forzar actualización inmediata">
+              <svg id="sync-refresh-icon" class="sync-refresh-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              <span>Actualizar ahora</span>
+            </button>
+          </div>
         </div>
 
         <!-- Contenedor dinámico de tarjetas -->
@@ -731,7 +749,7 @@
   </div>
 
   <!-- Scripts de la Aplicación -->
-  <script src="boe_codigos.js?v=11"></script>
-  <script src="app.js?v=11"></script>
+  <script src="boe_codigos.js?v=12"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>

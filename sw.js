@@ -1,5 +1,5 @@
-// OpoFinder - Service Worker v11 (Minimalist UI & Animated Ambient Background)
-const CACHE_NAME = 'opofinder-cache-v11';
+// OpoFinder - Service Worker v12 (12h Auto-Sync, Witness Badge & Minimalist UI)
+const CACHE_NAME = 'opofinder-cache-v12';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

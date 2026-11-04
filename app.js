@@ -26,7 +26,13 @@ function getSupabaseClient() {
 // Inicialización inmediata si ya está disponible
 getSupabaseClient();
 
-// --- 2. Estado de la Aplicación ---
+// --- 2. Estado de la Aplicación y Sincronización ---
+const STORAGE_KEY_OPOSICIONES = 'opofinder_cached_oposiciones';
+const STORAGE_KEY_LAST_UPDATE = 'opofinder_last_update';
+const AUTO_SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 horas (43.200.000 ms)
+let isSyncingData = false;
+let autoSyncTimer = null;
+
 const state = {
   currentTab: 'buscador', // 'buscador', 'guardadas', 'filtros', 'ayuda'
   oposiciones: [],        // Convocatorias cargadas desde el BOE y CCAA
@@ -496,12 +502,37 @@ async function handleUpdatePassword(e) {
 async function loadUserData() {
   await loadSavedOposiciones();
   await loadSavedFilters();
-  if (state.oposiciones.length === 0) {
-    await searchBOE();
-  } else {
-    checkFilterAlerts();
-    applyFiltersAndRender();
+
+  // 1. Cargar caché persistente en localStorage para renderizado instantáneo
+  const cachedRaw = localStorage.getItem(STORAGE_KEY_OPOSICIONES);
+  if (cachedRaw) {
+    try {
+      const cachedList = JSON.parse(cachedRaw);
+      if (Array.isArray(cachedList) && cachedList.length > 0) {
+        state.oposiciones = refreshDeadlinesForList(cachedList);
+        checkFilterAlerts();
+        applyFiltersAndRender();
+      }
+    } catch (e) {
+      console.warn('Error leyendo caché persistente de oposiciones:', e);
+    }
   }
+
+  // 2. Refrescar el testigo visual de última sincronización
+  updateSyncWitnessBadge();
+
+  // 3. Comprobar si requiere sincronización (si no hay datos o han pasado >= 12h)
+  const lastUpdate = parseInt(localStorage.getItem(STORAGE_KEY_LAST_UPDATE) || '0', 10);
+  const now = Date.now();
+  const needsSync = !lastUpdate || (now - lastUpdate >= AUTO_SYNC_INTERVAL_MS) || state.oposiciones.length === 0;
+
+  if (needsSync) {
+    console.log('[OpoFinder Sync] Actualización requerida (expiración de 12h o datos iniciales).');
+    await searchBOE({ silent: state.oposiciones.length > 0, force: false });
+  }
+
+  // 4. Iniciar programador automático de 12 horas y oyentes de ciclo de vida
+  startAutoSyncScheduler();
 }
 
 // --- 5. Navegación por Pestañas ---
@@ -752,34 +783,113 @@ const CCAA_PRELOADED_DATA = [
   }
 ];
 
-// --- 6. Consulta Conjunta (BOE + Boletines Autonómicos y OEPs) ---
-async function searchBOE() {
+// --- 6. Sincronización Conjunta (BOE + Boletines Autonómicos y OEPs) ---
+
+/**
+ * Recalcula dinámicamente los plazos de vencimiento y días hábiles
+ * respecto a la fecha actual para que la información esté viva y precisa.
+ */
+function refreshDeadlinesForList(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(item => {
+    if (item.fechaRaw && item.boletin === 'BOE') {
+      const dInfo = calculateDeadline(item.fechaRaw);
+      return {
+        ...item,
+        plazoLimite: dInfo.formattedDate,
+        diasRestantes: dInfo.daysLeft,
+        estadoPlazo: dInfo.status
+      };
+    }
+    return item;
+  });
+}
+
+/**
+ * Extrae los ítems de oposiciones de la Sección 2B del sumario diario del BOE.
+ */
+function extractBoeItemsFromSummary(data, dateStr) {
+  const items = [];
+  const diarios = data?.data?.sumario?.diario || [];
+  for (const d of (Array.isArray(diarios) ? diarios : [diarios])) {
+    const secciones = d?.seccion || [];
+    for (const sec of (Array.isArray(secciones) ? secciones : [secciones])) {
+      const secCode = sec?.['@codigo'] || sec?.codigo;
+      if (secCode === '2B') {
+        const deps = sec?.departamento || [];
+        for (const dep of (Array.isArray(deps) ? deps : [deps])) {
+          const depName = dep?.['@nombre'] || dep?.nombre || 'Administración Pública';
+          const epigrafes = dep?.epigrafe || [];
+          for (const epi of (Array.isArray(epigrafes) ? epigrafes : [epigrafes])) {
+            const epiItems = epi?.item || [];
+            for (const item of (Array.isArray(epiItems) ? epiItems : [epiItems])) {
+              const processed = processBoeItem(item, depName, dateStr);
+              if (processed) {
+                items.push(processed);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return items;
+}
+
+/**
+ * Consulta concurrente y paralela del BOE, CCAA y Supabase.
+ * Soporta actualización en segundo plano (silent: true) y forzado manual (force: true).
+ */
+async function searchBOE(options = {}) {
+  const force = options?.force === true;
+  const silent = options?.silent === true;
+
+  if (isSyncingData) {
+    console.log('[OpoFinder Sync] Sincronización ya en ejecución.');
+    return;
+  }
+
+  isSyncingData = true;
+  updateSyncWitnessBadge();
+
+  const forceBtn = document.getElementById('btn-force-sync');
+  if (forceBtn) {
+    forceBtn.classList.add('is-syncing');
+    forceBtn.disabled = true;
+  }
+
   const container = document.getElementById('results-container');
-  
-  state.loading = true;
-  container.innerHTML = `
-    <div class="loading-container">
-      <div class="spinner"></div>
-      <p>Cargando convocatorias del BOE y boletines autonómicos...</p>
-    </div>
-  `;
-  
-  const daysRange = parseInt(document.getElementById('filter-days').value) || 7;
+  // Solo se muestra el contenedor invasivo si no hay datos previos o si no es silenciosa
+  if (!silent && state.oposiciones.length === 0 && container) {
+    state.loading = true;
+    container.innerHTML = `
+      <div class="loading-container">
+        <div class="spinner"></div>
+        <p>Sincronizando convocatorias del BOE y boletines autonómicos...</p>
+      </div>
+    `;
+  }
+
+  const daysSelect = document.getElementById('filter-days');
+  const daysRange = daysSelect ? (parseInt(daysSelect.value, 10) || 7) : 7;
   const dates = getDatesList(daysRange);
   let allOpos = [];
 
   // 1. Cargar convocatorias autonómicas preconfiguradas
   allOpos.push(...CCAA_PRELOADED_DATA);
 
-  // 2. Cargar convocatorias adicionales desde Supabase si la tabla existe
+  // 2. Ejecutar tareas en paralelo para máximo rendimiento
+  const tasks = [];
+
+  // Tarea A: Convocatorias desde Supabase (si está configurado)
   const client = getSupabaseClient();
   if (client) {
-    try {
-      const { data: dbData, error } = await client.from('convocatorias').select('*');
-      if (!error && dbData && dbData.length > 0) {
-        for (const item of dbData) {
-          if (!allOpos.some(o => o.id === item.id)) {
-            allOpos.push({
+    tasks.push(
+      client.from('convocatorias').select('*').then(({ data: dbData, error }) => {
+        if (!error && dbData && dbData.length > 0) {
+          const list = [];
+          for (const item of dbData) {
+            list.push({
               id: item.id,
               titulo: item.titulo,
               organismo: item.organismo,
@@ -789,7 +899,7 @@ async function searchBOE() {
               tipo: item.tipo || 'Convocatoria',
               boletin: item.boletin || 'BOC',
               fechaPublicacion: item.fecha_publicacion,
-              fechaRaw: item.fecha_publicacion.replace(/\//g, ''),
+              fechaRaw: (item.fecha_publicacion || '').replace(/\//g, ''),
               plazoLimite: item.plazo_limite || 'Pendiente',
               diasRestantes: item.dias_restantes ?? 15,
               estadoPlazo: item.estado_plazo || 'abierto',
@@ -797,58 +907,210 @@ async function searchBOE() {
               urlOficial: item.url_oficial || ''
             });
           }
+          return list;
         }
-      }
-    } catch (e) {
-      console.warn('Convocatorias en Supabase no disponibles o aún no sincronizadas:', e);
-    }
+        return [];
+      }).catch(err => {
+        console.warn('Convocatorias en Supabase omitidas:', err);
+        return [];
+      })
+    );
   }
 
-  // 3. Cargar en vivo desde la API del BOE
+  // Tarea B: Consultas paralelas al BOE para cada fecha con timeout de 10s
   for (const dateStr of dates) {
-    try {
-      const url = `https://www.boe.es/datosabiertos/api/boe/sumario/${dateStr}`;
-      const resp = await fetch(url, {
-        headers: { 'Accept': 'application/json' }
-      });
-      
-      if (!resp.ok) continue;
-      
-      const data = await resp.json();
-      const diarios = data?.data?.sumario?.diario || [];
-      
-      for (const d of (Array.isArray(diarios) ? diarios : [diarios])) {
-        const secciones = d?.seccion || [];
-        for (const sec of (Array.isArray(secciones) ? secciones : [secciones])) {
-          const secCode = sec?.['@codigo'] || sec?.codigo;
-          if (secCode === '2B') {
-            const deps = sec?.departamento || [];
-            for (const dep of (Array.isArray(deps) ? deps : [deps])) {
-              const depName = dep?.['@nombre'] || dep?.nombre || 'Administración Pública';
-              const epigrafes = dep?.epigrafe || [];
-              for (const epi of (Array.isArray(epigrafes) ? epigrafes : [epigrafes])) {
-                const items = epi?.item || [];
-                for (const item of (Array.isArray(items) ? items : [items])) {
-                  const processed = processBoeItem(item, depName, dateStr);
-                  if (processed && !allOpos.some(o => o.id === processed.id)) {
-                    allOpos.push(processed);
-                  }
-                }
-              }
-            }
+    tasks.push(
+      (async () => {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 10000);
+          const url = `https://www.boe.es/datosabiertos/api/boe/sumario/${dateStr}`;
+          const resp = await fetch(url, {
+            headers: {
+              'Accept': 'application/json',
+              'Cache-Control': 'no-cache'
+            },
+            cache: 'no-cache',
+            signal: controller.signal
+          });
+          clearTimeout(timer);
+          if (!resp.ok) return [];
+          const data = await resp.json();
+          return extractBoeItemsFromSummary(data, dateStr);
+        } catch (e) {
+          console.warn(`[BOE API] Omisión día ${dateStr}:`, e.message || e);
+          return [];
+        }
+      })()
+    );
+  }
+
+  try {
+    const results = await Promise.allSettled(tasks);
+    for (const res of results) {
+      if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+        for (const item of res.value) {
+          if (!allOpos.some(o => o.id === item.id)) {
+            allOpos.push(item);
           }
         }
       }
-    } catch (e) {
-      console.warn(`No se pudo cargar el BOE del día ${dateStr}:`, e);
     }
+
+    // Recalcular plazos dinámicamente
+    allOpos = refreshDeadlinesForList(allOpos);
+
+    // Actualizar estado y caché persistente
+    state.oposiciones = allOpos;
+    state.loading = false;
+
+    localStorage.setItem(STORAGE_KEY_OPOSICIONES, JSON.stringify(allOpos));
+    localStorage.setItem(STORAGE_KEY_LAST_UPDATE, Date.now().toString());
+
+    checkFilterAlerts();
+    applyFiltersAndRender();
+
+    if (force) {
+      showToast(`Actualizado: ${allOpos.length} convocatorias sincronizadas`);
+    }
+  } catch (err) {
+    console.error('Error durante la sincronización:', err);
+    state.loading = false;
+    if (force) {
+      showToast('Error en la sincronización. Comprueba tu conexión.');
+    }
+  } finally {
+    isSyncingData = false;
+    if (forceBtn) {
+      forceBtn.classList.remove('is-syncing');
+      forceBtn.disabled = false;
+    }
+    updateSyncWitnessBadge();
   }
-  
-  state.oposiciones = allOpos;
-  state.loading = false;
-  
-  checkFilterAlerts();
-  applyFiltersAndRender();
+}
+
+/**
+ * Acción del Botón de Forzado manual para actualización inmediata.
+ */
+async function forceManualUpdate() {
+  if (isSyncingData) return;
+  const btn = document.getElementById('btn-force-sync');
+  if (btn) btn.disabled = true;
+  showToast('Iniciando sincronización con el BOE y CCAA...');
+  await searchBOE({ force: true, silent: false });
+}
+
+/**
+ * Actualiza el indicador visual ("testigo") del estado y fecha/hora
+ * exacta de la última actualización oficial.
+ */
+function updateSyncWitnessBadge() {
+  const badge = document.getElementById('sync-witness-badge');
+  const dot = document.getElementById('sync-status-dot');
+  const textEl = document.getElementById('sync-witness-text');
+
+  if (!badge || !dot || !textEl) return;
+
+  if (isSyncingData) {
+    dot.className = 'sync-dot syncing';
+    textEl.textContent = 'Sincronizando fuentes oficiales...';
+    badge.title = 'Actualizando convocatorias desde el BOE y boletines autonómicos...';
+    return;
+  }
+
+  const lastUpdate = parseInt(localStorage.getItem(STORAGE_KEY_LAST_UPDATE) || '0', 10);
+  if (!lastUpdate) {
+    dot.className = 'sync-dot pending';
+    textEl.textContent = 'Sin sincronizar';
+    badge.title = 'Aún no se ha realizado ninguna sincronización. Pulsa "Actualizar ahora".';
+    return;
+  }
+
+  const now = Date.now();
+  const elapsed = now - lastUpdate;
+  const isExpired = elapsed >= AUTO_SYNC_INTERVAL_MS;
+
+  const dateObj = new Date(lastUpdate);
+  const hours = String(dateObj.getHours()).padStart(2, '0');
+  const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const year = dateObj.getFullYear();
+  const fullDateStr = `${day}/${month}/${year} a las ${hours}:${minutes}`;
+
+  if (isExpired) {
+    dot.className = 'sync-dot pending';
+    textEl.textContent = 'Actualización pendiente (> 12h)';
+    badge.title = `Última sincronización: ${fullDateStr}. Han pasado más de 12 horas; se actualizará automáticamente o pulsa "Actualizar ahora".`;
+  } else {
+    dot.className = 'sync-dot fresh';
+
+    const today = new Date();
+    const isToday = dateObj.toDateString() === today.toDateString();
+
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const isYesterday = dateObj.toDateString() === yesterday.toDateString();
+
+    if (elapsed < 60 * 1000) {
+      textEl.textContent = 'Actualizado hace un momento';
+    } else if (elapsed < 60 * 60 * 1000) {
+      const mins = Math.floor(elapsed / (60 * 1000));
+      textEl.textContent = `Actualizado hace ${mins} min`;
+    } else if (isToday) {
+      textEl.textContent = `Actualizado hoy, ${hours}:${minutes}`;
+    } else if (isYesterday) {
+      textEl.textContent = `Actualizado ayer, ${hours}:${minutes}`;
+    } else {
+      textEl.textContent = `Actualizado ${day}/${month}, ${hours}:${minutes}`;
+    }
+
+    badge.title = `Última sincronización oficial: ${fullDateStr}. Sincronización automática cada 12 horas activa.`;
+  }
+}
+
+/**
+ * Automatización cada 12 horas:
+ * - Comprobación por intervalo en segundo plano cada 60 segundos.
+ * - Comprobación reactiva al reactivar la pestaña o desbloquear el móvil (PWA).
+ */
+function startAutoSyncScheduler() {
+  if (autoSyncTimer) clearInterval(autoSyncTimer);
+
+  autoSyncTimer = setInterval(() => {
+    checkAndAutoSync();
+  }, 60 * 1000);
+
+  if (!window._autoSyncListenersAttached) {
+    window._autoSyncListenersAttached = true;
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        checkAndAutoSync();
+      }
+    });
+
+    window.addEventListener('focus', () => {
+      checkAndAutoSync();
+    });
+
+    window.addEventListener('online', () => {
+      checkAndAutoSync();
+    });
+  }
+}
+
+function checkAndAutoSync() {
+  updateSyncWitnessBadge();
+  if (isSyncingData) return;
+
+  const lastUpdate = parseInt(localStorage.getItem(STORAGE_KEY_LAST_UPDATE) || '0', 10);
+  const now = Date.now();
+
+  if (!lastUpdate || (now - lastUpdate >= AUTO_SYNC_INTERVAL_MS)) {
+    console.log('[OpoFinder Auto-Sync] Han transcurrido más de 12 horas. Iniciando sincronización en segundo plano...');
+    searchBOE({ silent: true, force: false });
+  }
 }
 
 // --- 7. Procesamiento y Clasificación de Convocatorias ---
@@ -1560,7 +1822,7 @@ async function deleteFilter(id) {
 // --- 11. Service Worker & Notificaciones PWA ---
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=6').catch(err => {
+    navigator.serviceWorker.register('./sw.js?v=12').catch(err => {
       console.warn('Fallo SW:', err);
     });
   }
@@ -1591,9 +1853,9 @@ function setupEventListeners() {
   document.getElementById('filter-type')?.addEventListener('change', applyFiltersAndRender);
   document.getElementById('filter-hide-expired').addEventListener('change', applyFiltersAndRender);
   document.getElementById('filter-search').addEventListener('input', applyFiltersAndRender);
-  document.getElementById('filter-days').addEventListener('change', searchBOE);
+  document.getElementById('filter-days').addEventListener('change', () => searchBOE({ force: false, silent: false }));
   document.getElementById('btn-save-filter').addEventListener('click', saveCurrentFilter);
-  document.getElementById('btn-refresh-boe').addEventListener('click', searchBOE);
+  document.getElementById('btn-refresh-boe').addEventListener('click', () => searchBOE({ force: true, silent: false }));
   
   const closeIos = document.getElementById('close-ios-banner');
   if (closeIos) {
