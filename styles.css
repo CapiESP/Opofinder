@@ -1724,6 +1724,54 @@ body {
   padding: 1px 5px;
 }
 
+.desktop-nav .nav-badge {
+  background-color: var(--danger);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 1px 6px;
+  margin-left: 5px;
+  display: inline-block;
+}
+
+/* ==================== 8.1 TARJETAS DE AVISOS Y ALERTAS ==================== */
+.alert-card.alert-unread {
+  border-color: rgba(37, 99, 235, 0.45);
+  background-color: var(--bg-card);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.06);
+}
+
+.alert-card.alert-viewed {
+  opacity: 0.82;
+  background-color: var(--bg-card);
+  border-color: var(--border);
+}
+
+.badge-unread {
+  background-color: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  font-weight: 700;
+}
+
+.badge-viewed {
+  background-color: var(--bg-subtle);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.alert-matched-filter {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.alerts-filter-tabs .btn.active {
+  background-color: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+}
+
 /* ==================== 9. ESTADOS VACÍOS & SPINNER ==================== */
 .empty-state {
   text-align: center;

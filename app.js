@@ -38,6 +38,8 @@ const state = {
   oposiciones: [],        // Convocatorias cargadas desde el BOE y CCAA
   guardadas: [],          // Oposiciones marcadas por el usuario actual
   filtrosGuardados: [],   // Filtros de alerta del usuario actual
+  alertMatches: [],       // Convocatorias detectadas por las alertas
+  currentAlertFilterTab: 'pendientes', // 'pendientes', 'todas', 'visionadas'
   loading: false,
   alertCount: 0,
   currentModalOpo: null,  // Oposición actualmente abierta en el modal
@@ -565,6 +567,7 @@ function switchTab(tabName) {
   if (tabName === 'guardadas') {
     renderGuardadas();
   } else if (tabName === 'filtros') {
+    renderActiveAlerts();
     renderFiltrosList();
   } else if (tabName === 'biblioteca') {
     if (typeof renderBoeBiblioteca === 'function') {
@@ -1723,34 +1726,238 @@ async function loadSavedFilters() {
   }
 }
 
+// --- 10. Gestión de Avisos y Alertas Visionadas ---
+
+function getViewedAlerts() {
+  const userId = currentUser ? currentUser.id : 'guest';
+  try {
+    return JSON.parse(localStorage.getItem(`opofinder_viewed_alerts_${userId}`) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function markAlertAsViewed(opoId) {
+  if (!opoId) return;
+  const userId = currentUser ? currentUser.id : 'guest';
+  const viewed = getViewedAlerts();
+  if (!viewed.includes(opoId)) {
+    viewed.push(opoId);
+    localStorage.setItem(`opofinder_viewed_alerts_${userId}`, JSON.stringify(viewed));
+  }
+  checkFilterAlerts();
+}
+
+function markAllAlertsAsViewed() {
+  const userId = currentUser ? currentUser.id : 'guest';
+  const allIds = (state.alertMatches || []).map(a => a.opo.id);
+  localStorage.setItem(`opofinder_viewed_alerts_${userId}`, JSON.stringify(allIds));
+  checkFilterAlerts();
+  showToast('Todos los avisos marcados como visionados');
+}
+
+function updateAlertBadges(count) {
+  const mobileBadge = document.getElementById('filters-badge');
+  const desktopBadge = document.getElementById('desktop-filters-badge');
+  const unreadCounterBadge = document.getElementById('unread-alerts-counter-badge');
+  const alertBanner = document.getElementById('alert-banner');
+  const bannerText = document.getElementById('alert-banner-text');
+
+  if (mobileBadge) {
+    mobileBadge.textContent = count;
+    mobileBadge.style.display = count > 0 ? 'inline-block' : 'none';
+  }
+
+  if (desktopBadge) {
+    desktopBadge.textContent = count;
+    desktopBadge.style.display = count > 0 ? 'inline-block' : 'none';
+  }
+
+  if (unreadCounterBadge) {
+    if (count > 0) {
+      unreadCounterBadge.textContent = `${count} ${count === 1 ? 'pendiente' : 'pendientes'}`;
+      unreadCounterBadge.style.background = 'var(--danger-bg)';
+      unreadCounterBadge.style.color = 'var(--danger)';
+      unreadCounterBadge.style.borderColor = 'rgba(220, 38, 38, 0.3)';
+    } else {
+      unreadCounterBadge.textContent = 'Al día (0)';
+      unreadCounterBadge.style.background = 'var(--success-bg)';
+      unreadCounterBadge.style.color = 'var(--success)';
+      unreadCounterBadge.style.borderColor = 'rgba(21, 128, 61, 0.3)';
+    }
+  }
+
+  if (alertBanner) {
+    if (count > 0) {
+      alertBanner.style.display = 'flex';
+      if (bannerText) {
+        bannerText.textContent = `¡Atención! Hay ${count} ${count === 1 ? 'convocatoria activa' : 'convocatorias activas'} sin visionar coincidentes con tus alertas.`;
+      }
+    } else {
+      alertBanner.style.display = 'none';
+    }
+  }
+}
+
 function checkFilterAlerts() {
-  if (!state.filtrosGuardados || state.filtrosGuardados.length === 0) return;
-  
-  let matchesCount = 0;
+  if (!state.filtrosGuardados || state.filtrosGuardados.length === 0) {
+    state.alertCount = 0;
+    state.alertMatches = [];
+    updateAlertBadges(0);
+    renderActiveAlerts();
+    return;
+  }
+
+  const viewedIds = getViewedAlerts();
+  const matchesMap = new Map();
+
   for (const filter of state.filtrosGuardados) {
     if (!filter.activo) continue;
-    const matches = state.oposiciones.filter(o => {
+    const matches = (state.oposiciones || []).filter(o => {
       const matchCat = filter.categoria === 'TODAS' || o.categoria === filter.categoria;
       const matchReg = filter.region === 'TODAS' || o.region === filter.region;
       const matchKw = !filter.palabra_clave || `${o.titulo} ${o.organismo}`.toLowerCase().includes(filter.palabra_clave.toLowerCase());
       return matchCat && matchReg && matchKw;
     });
-    matchesCount += matches.length;
+
+    for (const match of matches) {
+      const filterLabel = filter.nombre || `${filter.categoria} en ${filter.region}`;
+      if (!matchesMap.has(match.id)) {
+        matchesMap.set(match.id, {
+          opo: match,
+          filters: [filterLabel],
+          isViewed: viewedIds.includes(match.id)
+        });
+      } else {
+        const existing = matchesMap.get(match.id);
+        if (!existing.filters.includes(filterLabel)) {
+          existing.filters.push(filterLabel);
+        }
+      }
+    }
   }
-  
-  state.alertCount = matchesCount;
-  const alertBadge = document.getElementById('filters-badge');
-  if (alertBadge) {
-    alertBadge.textContent = matchesCount;
-    alertBadge.style.display = matchesCount > 0 ? 'inline-block' : 'none';
+
+  const allAlerts = Array.from(matchesMap.values());
+  state.alertMatches = allAlerts;
+
+  const unreadCount = allAlerts.filter(a => !a.isViewed).length;
+  state.alertCount = unreadCount;
+
+  updateAlertBadges(unreadCount);
+  renderActiveAlerts();
+}
+
+function switchAlertFilterTab(tabName) {
+  state.currentAlertFilterTab = tabName;
+  ['pendientes', 'todas', 'visionadas'].forEach(t => {
+    const btn = document.getElementById(`filter-alert-tab-${t}`);
+    if (btn) btn.classList.toggle('active', t === tabName);
+  });
+  renderActiveAlerts();
+}
+
+function renderActiveAlerts() {
+  const container = document.getElementById('active-alerts-list');
+  if (!container) return;
+
+  const alerts = state.alertMatches || [];
+  const currentFilter = state.currentAlertFilterTab || 'pendientes';
+
+  let filteredAlerts = alerts;
+  if (currentFilter === 'pendientes') {
+    filteredAlerts = alerts.filter(a => !a.isViewed);
+  } else if (currentFilter === 'visionadas') {
+    filteredAlerts = alerts.filter(a => a.isViewed);
   }
-  
-  const alertBanner = document.getElementById('alert-banner');
-  if (alertBanner && matchesCount > 0) {
-    alertBanner.style.display = 'flex';
-    document.getElementById('alert-banner-text').textContent = 
-      `¡Atención! Hay ${matchesCount} convocatorias activas que coinciden con tus filtros de alerta guardados.`;
+
+  if (alerts.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 24px 16px;">
+        <svg class="icon-inline" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); margin-bottom: 6px;">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 8v4"></path>
+          <path d="M12 16h.01"></path>
+        </svg>
+        <h4 style="font-size: 14px; font-weight: 700; color: var(--text-main); margin: 0;">No hay alertas coincidentes en este momento</h4>
+        <p style="color: var(--text-muted); font-size: 12px; margin-top: 4px;">
+          Cuando se publiquen convocatorias en el BOE o CCAA que coincidan con tus criterios guardados, aparecerán listadas aquí con aviso prioritario.
+        </p>
+      </div>
+    `;
+    return;
   }
+
+  if (filteredAlerts.length === 0) {
+    const message = currentFilter === 'pendientes'
+      ? '¡Todo al día! Has visionado todas las convocatorias detectadas por tus alertas.'
+      : 'No hay convocatorias visionadas aún en esta sección.';
+
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 24px 16px;">
+        <svg class="icon-inline" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--success); margin-bottom: 6px;">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        <h4 style="font-size: 14px; font-weight: 700; color: var(--text-main); margin: 0;">${message}</h4>
+        <p style="color: var(--text-muted); font-size: 12px; margin-top: 4px;">
+          Puedes pulsar en "Todas las detectadas" para consultar el histórico de avisos recibidos.
+        </p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filteredAlerts.map(a => {
+    const item = a.opo;
+    const plazasCount = item.plazas || 1;
+    const plazasText = `${plazasCount} ${plazasCount === 1 ? 'plaza' : 'plazas'}`;
+
+    return `
+      <div class="opo-card alert-card ${a.isViewed ? 'alert-viewed' : 'alert-unread'}" id="alert-card-${item.id}" onclick="openDetailModal('${item.id}')">
+        <div class="card-summary-header">
+          <div class="badges-row">
+            <span class="badge ${a.isViewed ? 'badge-viewed' : 'badge-unread'}">
+              ${a.isViewed ? '✓ Visionada' : '● Nuevo aviso'}
+            </span>
+            <span class="badge badge-${(item.categoria || 'otra').toLowerCase()}">${escapeHTML(item.categoria || 'OTRA')}</span>
+            <span class="badge badge-region">${escapeHTML(item.region || 'Estatal')}</span>
+            <span class="badge badge-plazas">${plazasText}</span>
+          </div>
+          <span class="alert-matched-filter" title="Criterio de alerta coincidente">
+            Alerta: <strong>${escapeHTML(a.filters.join(', '))}</strong>
+          </span>
+        </div>
+
+        <div class="card-summary-title">
+          ${escapeHTML(item.titulo)}
+        </div>
+
+        <div class="card-summary-footer">
+          <span class="card-summary-org">${escapeHTML(item.organismo)}</span>
+          <div style="display: flex; gap: 6px; align-items: center;" onclick="event.stopPropagation()">
+            ${!a.isViewed ? `
+              <button type="button" class="btn btn-outline btn-sm" onclick="markAlertAsViewed('${item.id}')" title="Marcar como vista y descontar del número de avisos">
+                Marcar como vista
+              </button>
+            ` : ''}
+            <button type="button" class="btn btn-primary btn-sm" onclick="openDetailModal('${item.id}')">
+              Ver convocatoria
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function handleViewAlertsBannerClick() {
+  switchTab('filtros');
+  setTimeout(() => {
+    const el = document.getElementById('active-alerts-panel');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, 100);
 }
 
 function renderFiltrosList() {
@@ -1981,6 +2188,9 @@ function applyTheme(theme) {
 function openDetailModal(id) {
   const opo = state.oposiciones.find(o => o.id === id) || state.guardadas.find(g => g.id === id);
   if (!opo) return;
+
+  // Al visionar la convocatoria, se resta automáticamente del número de avisos pendientes
+  markAlertAsViewed(id);
 
   state.currentModalOpo = opo;
   state.currentModalTab = 'requerimientos';
